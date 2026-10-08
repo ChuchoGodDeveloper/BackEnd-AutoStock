@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AutoStock.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/[Controller]")]
 [Authorize]
 public class CatalogoController : ControllerBase
 {
