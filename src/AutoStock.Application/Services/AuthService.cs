@@ -103,6 +103,7 @@ public class AuthService : IAuthService
         {
             Token = token,
             ExpiraEn = expiresAt,
+            RequiereCambioPassword = usuario.RequiereCambioPassword,
             Usuario = new UsuarioLoginDto
             {
                 Id = usuario.Id,
@@ -151,5 +152,44 @@ public class AuthService : IAuthService
             Activo = usuario.Activo,
             FechaCreacion = usuario.FechaCreacion,
         };
+    }
+
+    public async Task CambiarPasswordPrimerAccesoAsync(CambiarPasswordDto dto, int usuarioId)
+    {
+        if (string.IsNullOrWhiteSpace(dto.PasswordActual) || string.IsNullOrWhiteSpace(dto.PasswordNueva))
+        {
+            throw new ValidationAppException("La contraseña actual y la nueva son obligatorias");
+        }
+
+        if (dto.PasswordNueva.Length < 8 ||
+            !dto.PasswordNueva.Any(char.IsLetter) ||
+            !dto.PasswordNueva.Any(char.IsDigit))
+        {
+            throw new ValidationAppException("La nueva contraseña debe tener al menos 8 caracteres, con letras y números");
+        }
+
+        if (dto.PasswordNueva == dto.PasswordActual)
+        {
+            throw new ValidationAppException("La nueva contraseña debe ser distinta a la actual");
+        }
+
+        var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
+
+        if (usuario is null)
+        {
+            throw new AuthenticationFailedException("Usuario no encontrado");
+        }
+
+        if (!_passwordHasher.Verify(dto.PasswordActual, usuario.PasswordHash))
+        {
+            throw new ValidationAppException("La contraseña actual es incorrecta");
+        }
+
+        usuario.PasswordHash = _passwordHasher.Hash(dto.PasswordNueva);
+        usuario.RequiereCambioPassword = false;
+        usuario.IntentosFallidos = 0;
+
+        _usuarioRepository.Update(usuario);
+        await _unitOfWork.SaveChangesAsync();
     }
 }

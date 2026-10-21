@@ -14,6 +14,8 @@ public class Usuario
 
     public bool Activo { get; set; } = true;
 
+    public bool RequiereCambioPassword { get; set; }
+
     public int IntentosFallidos { get; set; }
 
     public DateTime? BloqueadoHasta { get; set; }

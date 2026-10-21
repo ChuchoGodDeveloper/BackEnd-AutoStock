@@ -56,4 +56,20 @@ public class AuthController : ControllerBase
         var perfil = await _authService.GetPerfilActualAsync(usuarioId);
         return Ok(perfil);
     }
+
+    [HttpPost("cambiar-password")]
+    [Authorize]
+    public async Task<IActionResult> CambiarPasswordPrimerAcceso([FromBody] CambiarPasswordDto dto)
+    {
+        var sub = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (!int.TryParse(sub, out var usuarioId))
+        {
+            return Unauthorized(new { mensaje = "Token inválido" });
+        }
+
+        await _authService.CambiarPasswordPrimerAccesoAsync(dto, usuarioId);
+        return Ok(new { mensaje = "Contraseña actualizada correctamente" });
+    }
 }

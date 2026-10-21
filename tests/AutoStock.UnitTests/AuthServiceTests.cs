@@ -294,4 +294,58 @@ public class AuthServiceTests
         Assert.True(sesion.FechaCierre <= DateTime.UtcNow);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task Login_UsuarioNuevo_DebeCambiarPassword_DevuelveRequiereCambioPasswordTrue()
+    {
+        var usuario = UsuarioActivoAdministrador();
+        usuario.RequiereCambioPassword = true;
+
+        _usuarioRepositoryMock
+            .Setup(r => r.GetByIdentifierAsync("emp-00001"))
+            .ReturnsAsync(usuario);
+        _passwordHasherMock
+            .Setup(h => h.Verify("TempPassword2026", "hash-valido"))
+            .Returns(true);
+        ConfigurarJwt(usuario);
+
+        var resultado = await _authService.LoginAsync(new LoginRequestDto
+        {
+            Identificador = "EMP-00001",
+            Password = "TempPassword2026",
+        });
+
+        Assert.True(resultado.RequiereCambioPassword);
+        Assert.Equal("token-jwt-falso", resultado.Token);
+    }
+
+    [Fact]
+    public async Task CambiarPasswordPrimerAcceso_ConPasswordActualValida_ActualizaHashYQuitaRequiereCambio()
+    {
+        var usuario = UsuarioActivoAdministrador();
+        usuario.RequiereCambioPassword = true;
+        usuario.IntentosFallidos = 3;
+
+        _usuarioRepositoryMock
+            .Setup(r => r.GetByIdAsync(1))
+            .ReturnsAsync(usuario);
+        _passwordHasherMock
+            .Setup(h => h.Verify("Temporal2026", "hash-valido"))
+            .Returns(true);
+        _passwordHasherMock
+            .Setup(h => h.Hash("NuevaClave2026"))
+            .Returns("hash-nuevo");
+
+        await _authService.CambiarPasswordPrimerAccesoAsync(new CambiarPasswordDto
+        {
+            PasswordActual = "Temporal2026",
+            PasswordNueva = "NuevaClave2026",
+        }, usuarioId: 1);
+
+        Assert.Equal("hash-nuevo", usuario.PasswordHash);
+        Assert.False(usuario.RequiereCambioPassword);
+        Assert.Equal(0, usuario.IntentosFallidos);
+        _usuarioRepositoryMock.Verify(r => r.Update(usuario), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

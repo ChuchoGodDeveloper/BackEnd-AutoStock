@@ -40,6 +40,10 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(u => u.RequiereCambioPassword)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(u => u.IntentosFallidos)
             .IsRequired()
             .HasDefaultValue(0);

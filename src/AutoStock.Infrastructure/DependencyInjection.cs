@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
 
         services.AddScoped<IUsuarioRepository, UsuarioRepository>();
+        services.AddScoped<IRolRepository, RolRepository>();
         services.AddScoped<ISesionRepository, SesionRepository>();
         services.AddScoped<IVehiculoRepository, VehiculoRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IVehiculosService, VehiculosService>();
+        services.AddScoped<IUsuariosService, UsuariosService>();
 
         return services;
     }

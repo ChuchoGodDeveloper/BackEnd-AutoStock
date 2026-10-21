@@ -9,4 +9,6 @@ public interface IAuthService
     Task LogoutAsync(string jti);
 
     Task<PerfilResponseDto> GetPerfilActualAsync(int usuarioId);
+
+    Task CambiarPasswordPrimerAccesoAsync(CambiarPasswordDto dto, int usuarioId);
 }

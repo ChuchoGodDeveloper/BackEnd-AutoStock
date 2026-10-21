@@ -6,5 +6,7 @@ public class LoginResponseDto
 
     public DateTime ExpiraEn { get; set; }
 
+    public bool RequiereCambioPassword { get; set; }
+
     public UsuarioLoginDto Usuario { get; set; } = null!;
 }

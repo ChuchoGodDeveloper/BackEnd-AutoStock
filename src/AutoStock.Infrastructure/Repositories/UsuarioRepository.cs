@@ -30,6 +30,29 @@ public class UsuarioRepository : IUsuarioRepository
             .FirstOrDefaultAsync(u => u.Id == id);
     }
 
+    public async Task<bool> ExisteEmpleadoIdOCorreoAsync(string empleadoId, string correo)
+    {
+        var empleadoNormalizado = empleadoId.Trim().ToLower();
+        var correoNormalizado = correo.Trim().ToLower();
+
+        return await _context.Usuarios.AnyAsync(u =>
+            u.EmpleadoId.ToLower() == empleadoNormalizado ||
+            u.Correo.ToLower() == correoNormalizado);
+    }
+
+    public async Task AddAsync(Usuario usuario)
+    {
+        await _context.Usuarios.AddAsync(usuario);
+    }
+
+    public async Task<IReadOnlyList<Usuario>> GetAllAsync()
+    {
+        return await _context.Usuarios
+            .Include(u => u.Rol)
+            .OrderBy(u => u.NombreCompleto)
+            .ToListAsync();
+    }
+
     public void Update(Usuario usuario)
     {
         _context.Usuarios.Update(usuario);
