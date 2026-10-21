@@ -143,6 +143,63 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.ToTable("Usuarios", (string)null);
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.Vehiculo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Anio")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CajonLote")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Estado")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FechaRegistro")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FotoPrincipalUrl")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("Kilometraje")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Marca")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Modelo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Placa")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("Precio")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("ZonaLote")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Estado");
+
+                    b.HasIndex("FechaRegistro");
+
+                    b.ToTable("Vehiculos", (string)null);
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.Sesion", b =>
                 {
                     b.HasOne("AutoStock.Domain.Entities.Usuario", "Usuario")

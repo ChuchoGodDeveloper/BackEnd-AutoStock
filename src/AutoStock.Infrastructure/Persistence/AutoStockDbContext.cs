@@ -16,6 +16,8 @@ public class AutoStockDbContext : DbContext
 
     public DbSet<Sesion> Sesiones => Set<Sesion>();
 
+    public DbSet<Vehiculo> Vehiculos => Set<Vehiculo>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
