@@ -231,4 +231,157 @@ public class VehiculosServiceTests
 
         await Assert.ThrowsAsync<NotFoundException>(() => _vehiculosService.GetVehiculoByIdAsync(id));
     }
+
+    private static Vehiculo CrearVehiculoParaBusqueda(
+        int indice,
+        string marca,
+        string modelo,
+        string? placa,
+        string vin,
+        EstadoOperativo estado = EstadoOperativo.Disponible)
+    {
+        return new Vehiculo
+        {
+            Id = Guid.Parse($"00000000-0000-0000-0000-{(indice + 1).ToString("D12")}"),
+            Marca = marca,
+            Modelo = modelo,
+            Anio = 2024,
+            Precio = 300000m,
+            Kilometraje = 10000,
+            Placa = placa,
+            ZonaLote = "Z1",
+            CajonLote = "A01",
+            FotoPrincipalUrl = null,
+            Estado = estado,
+            FechaRegistro = new DateTime(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc).AddMinutes(indice),
+            VIN = vin,
+            NumeroStock = $"STK-{(indice + 1):D4}",
+        };
+    }
+
+    [Fact]
+    public async Task GetCatalogoAsync_BusquedaPorVinParcial_DevuelveCoincidencia()
+    {
+        var vehiculos = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST24000000001"),
+            CrearVehiculoParaBusqueda(1, "Mazda", "CX-5", "ABC-1001", "3AUTST25000000002"),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var resultado = await _vehiculosService.GetCatalogoAsync(busqueda: "000001");
+
+        Assert.Single(resultado.Items);
+        Assert.Equal(vehiculos[0].Id, resultado.Items[0].Id);
+        Assert.Equal(1, resultado.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetCatalogoAsync_BusquedaPorPlacaEnMinusculasSinGuiones_DevuelveCoincidencia()
+    {
+        var vehiculos = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(0, "Nissan", "Versa", "PZG-482-B", "3AUTST24000000010"),
+            CrearVehiculoParaBusqueda(1, "Kia", "Rio", "ABC-1001", "3AUTST24000000011"),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var resultado = await _vehiculosService.GetCatalogoAsync(busqueda: "pzg482b");
+
+        Assert.Single(resultado.Items);
+        Assert.Equal("PZG-482-B", resultado.Items[0].Placa);
+        Assert.Equal(1, resultado.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetCatalogoAsync_BusquedaPorMarcaOModelo_DevuelveCoincidencias()
+    {
+        var vehiculos = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST24000000020"),
+            CrearVehiculoParaBusqueda(1, "Mazda", "CX-5", "ABC-1001", "3AUTST24000000021"),
+            CrearVehiculoParaBusqueda(2, "Honda", "CR-V", "ABC-1002", "3AUTST24000000022"),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var porMarca = await _vehiculosService.GetCatalogoAsync(busqueda: "toyota");
+        var porModelo = await _vehiculosService.GetCatalogoAsync(busqueda: "cx");
+
+        Assert.Single(porMarca.Items);
+        Assert.Equal("Toyota", porMarca.Items[0].Marca);
+        Assert.Single(porModelo.Items);
+        Assert.Equal("CX-5", porModelo.Items[0].Modelo);
+    }
+
+    [Fact]
+    public async Task GetCatalogoAsync_BusquedaSinResultados_DevuelveListaVaciaYTotalCero()
+    {
+        var vehiculos = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST24000000030"),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var resultado = await _vehiculosService.GetCatalogoAsync(busqueda: "zzz-no-existe");
+
+        Assert.Empty(resultado.Items);
+        Assert.Equal(0, resultado.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetCatalogoAsync_BusquedaSeCombinaConPaginacionYExcluyeVendidos()
+    {
+        var fechaBase = new DateTime(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc);
+        var vehiculos = new List<Vehiculo>();
+
+        for (var indice = 0; indice < 5; indice++)
+        {
+            vehiculos.Add(new Vehiculo
+            {
+                Id = Guid.Parse($"00000000-0000-0000-0000-{(indice + 1).ToString("D12")}"),
+                Marca = "Toyota",
+                Modelo = "Corolla",
+                Anio = 2024,
+                Precio = 300000m,
+                Kilometraje = 10000,
+                Placa = $"ABC-{1000 + indice}",
+                ZonaLote = "Z1",
+                CajonLote = "A01",
+                FotoPrincipalUrl = null,
+                Estado = EstadoOperativo.Disponible,
+                FechaRegistro = fechaBase.AddMinutes(indice),
+                VIN = $"3AUTST240000000{40 + indice}",
+                NumeroStock = $"STK-{(indice + 1):D4}",
+            });
+        }
+
+        vehiculos.Add(CrearVehiculoParaBusqueda(10, "Toyota", "Corolla", "VEN-0001", "3AUTST24000000050", EstadoOperativo.Vendido));
+        vehiculos.Add(CrearVehiculoParaBusqueda(11, "Mazda", "CX-5", "ABC-1999", "3AUTST24000000051"));
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var pagina1 = await _vehiculosService.GetCatalogoAsync(1, 2, "corolla");
+        var pagina3 = await _vehiculosService.GetCatalogoAsync(3, 2, "corolla");
+
+        Assert.Equal(5, pagina1.TotalCount);
+        Assert.Equal(2, pagina1.Items.Count);
+        Assert.DoesNotContain(pagina1.Items, vehiculo => vehiculo.Estado == nameof(EstadoOperativo.Vendido));
+        Assert.DoesNotContain(pagina1.Items, vehiculo => vehiculo.Placa == "VEN-0001");
+        Assert.Equal(1, pagina3.Items.Count);
+        Assert.All(pagina1.Items, vehiculo => Assert.Equal("Toyota", vehiculo.Marca));
+    }
 }

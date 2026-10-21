@@ -20,9 +20,10 @@ public class VehiculosController : ControllerBase
     [HttpGet("catalogo")]
     public async Task<ActionResult<PaginatedResult<VehiculoDto>>> GetCatalogo(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? busqueda = null)
     {
-        var resultado = await _vehiculosService.GetCatalogoAsync(page, pageSize);
+        var resultado = await _vehiculosService.GetCatalogoAsync(page, pageSize, busqueda);
         return Ok(resultado);
     }
 

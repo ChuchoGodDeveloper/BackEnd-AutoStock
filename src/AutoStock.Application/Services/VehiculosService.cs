@@ -19,12 +19,26 @@ public class VehiculosService : IVehiculosService
         _vehiculoRepository = vehiculoRepository;
     }
 
-    public async Task<PaginatedResult<VehiculoDto>> GetCatalogoAsync(int page = 1, int pageSize = 20)
+    public async Task<PaginatedResult<VehiculoDto>> GetCatalogoAsync(int page = 1, int pageSize = 20, string? busqueda = null)
     {
         var vehiculos = await _vehiculoRepository.ObtenerTodosAsync();
 
-        var catalogo = vehiculos
-            .Where(v => v.Estado != EstadoOperativo.Vendido)
+        IEnumerable<Vehiculo> catalogo = vehiculos
+            .Where(v => v.Estado != EstadoOperativo.Vendido);
+
+        if (!string.IsNullOrWhiteSpace(busqueda))
+        {
+            var termino = NormalizarTexto(busqueda);
+
+            catalogo = catalogo.Where(v =>
+                Contiene(v.Marca, termino) ||
+                Contiene(v.Modelo, termino) ||
+                Contiene(v.Anio.ToString(), termino) ||
+                Contiene(v.VIN, termino) ||
+                Contiene(v.Placa, termino));
+        }
+
+        var catalogoFiltrado = catalogo
             .OrderByDescending(v => v.FechaRegistro)
             .ToList();
 
@@ -33,7 +47,7 @@ public class VehiculosService : IVehiculosService
             ? TamanioPaginaPorDefecto
             : Math.Min(pageSize, TamanioPaginaMaximo);
 
-        var items = catalogo
+        var items = catalogoFiltrado
             .Skip((pagina - 1) * tamanio)
             .Take(tamanio)
             .Select(CrearDto)
@@ -42,7 +56,7 @@ public class VehiculosService : IVehiculosService
         return new PaginatedResult<VehiculoDto>
         {
             Items = items,
-            TotalCount = catalogo.Count,
+            TotalCount = catalogoFiltrado.Count,
             Page = pagina,
             PageSize = tamanio,
         };
@@ -58,6 +72,17 @@ public class VehiculosService : IVehiculosService
         }
 
         return CrearDetalleDto(vehiculo);
+    }
+
+    private static string NormalizarTexto(string valor)
+    {
+        return valor.Replace(" ", string.Empty).Replace("-", string.Empty).ToUpperInvariant();
+    }
+
+    private static bool Contiene(string? valor, string terminoNormalizado)
+    {
+        return !string.IsNullOrWhiteSpace(valor) &&
+               NormalizarTexto(valor).Contains(terminoNormalizado, StringComparison.Ordinal);
     }
 
     private static VehiculoDto CrearDto(Vehiculo vehiculo) => new()
