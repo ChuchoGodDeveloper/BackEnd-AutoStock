@@ -26,6 +26,8 @@ public class Vehiculo
 
     public EstadoOperativo Estado { get; set; }
 
+    public TipoVehiculo Tipo { get; set; }
+
     public DateTime FechaRegistro { get; set; }
 
     public string VIN { get; set; } = string.Empty;

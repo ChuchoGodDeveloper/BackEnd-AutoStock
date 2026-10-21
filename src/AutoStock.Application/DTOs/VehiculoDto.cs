@@ -24,5 +24,7 @@ public class VehiculoDto
 
     public string Estado { get; set; } = string.Empty;
 
+    public string Tipo { get; set; } = string.Empty;
+
     public DateTime FechaRegistro { get; set; }
 }

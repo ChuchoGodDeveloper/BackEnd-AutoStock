@@ -19,12 +19,42 @@ public class VehiculosService : IVehiculosService
         _vehiculoRepository = vehiculoRepository;
     }
 
-    public async Task<PaginatedResult<VehiculoDto>> GetCatalogoAsync(int page = 1, int pageSize = 20, string? busqueda = null)
+    public async Task<PaginatedResult<VehiculoDto>> GetCatalogoAsync(
+        int page = 1,
+        int pageSize = 20,
+        string? busqueda = null,
+        List<EstadoOperativo>? estados = null,
+        TipoVehiculo? tipo = null,
+        decimal? precioMin = null,
+        decimal? precioMax = null)
     {
         var vehiculos = await _vehiculoRepository.ObtenerTodosAsync();
 
-        IEnumerable<Vehiculo> catalogo = vehiculos
-            .Where(v => v.Estado != EstadoOperativo.Vendido);
+        IEnumerable<Vehiculo> catalogo = vehiculos;
+
+        if (estados is { Count: > 0 })
+        {
+            catalogo = catalogo.Where(v => estados.Contains(v.Estado));
+        }
+        else
+        {
+            catalogo = catalogo.Where(v => v.Estado != EstadoOperativo.Vendido);
+        }
+
+        if (tipo.HasValue)
+        {
+            catalogo = catalogo.Where(v => v.Tipo == tipo.Value);
+        }
+
+        if (precioMin.HasValue)
+        {
+            catalogo = catalogo.Where(v => v.Precio >= precioMin.Value);
+        }
+
+        if (precioMax.HasValue)
+        {
+            catalogo = catalogo.Where(v => v.Precio <= precioMax.Value);
+        }
 
         if (!string.IsNullOrWhiteSpace(busqueda))
         {
@@ -59,6 +89,23 @@ public class VehiculosService : IVehiculosService
             TotalCount = catalogoFiltrado.Count,
             Page = pagina,
             PageSize = tamanio,
+        };
+    }
+
+    public async Task<ConteosRapidosDto> GetConteosRapidosAsync()
+    {
+        var vehiculos = await _vehiculoRepository.ObtenerTodosAsync();
+
+        var activos = vehiculos
+            .Where(v => v.Estado != EstadoOperativo.Vendido)
+            .ToList();
+
+        return new ConteosRapidosDto
+        {
+            Todos = activos.Count,
+            Disponibles = activos.Count(v => v.Estado == EstadoOperativo.Disponible),
+            Seminuevos = activos.Count(v => v.Tipo == TipoVehiculo.Seminuevo),
+            Nuevos = activos.Count(v => v.Tipo == TipoVehiculo.Nuevo),
         };
     }
 
@@ -98,6 +145,7 @@ public class VehiculosService : IVehiculosService
         CajonLote = vehiculo.CajonLote,
         FotoPrincipalUrl = vehiculo.FotoPrincipalUrl,
         Estado = vehiculo.Estado.ToString(),
+        Tipo = vehiculo.Tipo.ToString(),
         FechaRegistro = vehiculo.FechaRegistro,
     };
 

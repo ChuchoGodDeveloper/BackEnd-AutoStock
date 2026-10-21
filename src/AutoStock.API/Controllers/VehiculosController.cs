@@ -1,5 +1,6 @@
 using AutoStock.Application.DTOs;
 using AutoStock.Application.Interfaces;
+using AutoStock.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,9 +22,21 @@ public class VehiculosController : ControllerBase
     public async Task<ActionResult<PaginatedResult<VehiculoDto>>> GetCatalogo(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        [FromQuery] string? busqueda = null)
+        [FromQuery] string? busqueda = null,
+        [FromQuery(Name = "estados[]")] List<EstadoOperativo>? estados = null,
+        [FromQuery] TipoVehiculo? tipo = null,
+        [FromQuery] decimal? precioMin = null,
+        [FromQuery] decimal? precioMax = null)
     {
-        var resultado = await _vehiculosService.GetCatalogoAsync(page, pageSize, busqueda);
+        var resultado = await _vehiculosService.GetCatalogoAsync(
+            page, pageSize, busqueda, estados, tipo, precioMin, precioMax);
+        return Ok(resultado);
+    }
+
+    [HttpGet("conteos-rapidos")]
+    public async Task<ActionResult<ConteosRapidosDto>> GetConteosRapidos()
+    {
+        var resultado = await _vehiculosService.GetConteosRapidosAsync();
         return Ok(resultado);
     }
 

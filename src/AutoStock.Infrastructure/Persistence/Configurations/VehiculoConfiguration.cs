@@ -1,4 +1,5 @@
 using AutoStock.Domain.Entities;
+using AutoStock.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -49,6 +50,10 @@ public class VehiculoConfiguration : IEntityTypeConfiguration<Vehiculo>
 
         builder.Property(v => v.Estado)
             .IsRequired();
+
+        builder.Property(v => v.Tipo)
+            .IsRequired()
+            .HasDefaultValue(TipoVehiculo.Seminuevo);
 
         builder.Property(v => v.FechaRegistro)
             .IsRequired()

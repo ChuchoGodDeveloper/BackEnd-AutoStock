@@ -241,6 +241,11 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Precio")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<int>("Tipo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(2);
+
                     b.Property<string>("Transmision")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");

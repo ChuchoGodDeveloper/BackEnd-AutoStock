@@ -238,7 +238,9 @@ public class VehiculosServiceTests
         string modelo,
         string? placa,
         string vin,
-        EstadoOperativo estado = EstadoOperativo.Disponible)
+        EstadoOperativo estado = EstadoOperativo.Disponible,
+        decimal precio = 300000m,
+        TipoVehiculo tipo = TipoVehiculo.Seminuevo)
     {
         return new Vehiculo
         {
@@ -246,13 +248,14 @@ public class VehiculosServiceTests
             Marca = marca,
             Modelo = modelo,
             Anio = 2024,
-            Precio = 300000m,
+            Precio = precio,
             Kilometraje = 10000,
             Placa = placa,
             ZonaLote = "Z1",
             CajonLote = "A01",
             FotoPrincipalUrl = null,
             Estado = estado,
+            Tipo = tipo,
             FechaRegistro = new DateTime(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc).AddMinutes(indice),
             VIN = vin,
             NumeroStock = $"STK-{(indice + 1):D4}",
@@ -383,5 +386,127 @@ public class VehiculosServiceTests
         Assert.DoesNotContain(pagina1.Items, vehiculo => vehiculo.Placa == "VEN-0001");
         Assert.Equal(1, pagina3.Items.Count);
         Assert.All(pagina1.Items, vehiculo => Assert.Equal("Toyota", vehiculo.Marca));
+    }
+
+    [Fact]
+    public async Task GetCatalogoAsync_FiltradoPorEstadosCombinados_DevuelveUnionDeEstados()
+    {
+        var vehiculos = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(0, "Kia", "Sportage", "ABC-1000", "3AUTST24000000100", EstadoOperativo.EnTaller),
+            CrearVehiculoParaBusqueda(1, "Renault", "Kwid", "ABC-1001", "3AUTST24000000101", EstadoOperativo.EnLavado),
+            CrearVehiculoParaBusqueda(2, "Toyota", "Corolla", "ABC-1002", "3AUTST24000000102", EstadoOperativo.Disponible),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var resultado = await _vehiculosService.GetCatalogoAsync(
+            estados: [EstadoOperativo.EnTaller, EstadoOperativo.EnLavado]);
+
+        Assert.Equal(2, resultado.TotalCount);
+        Assert.All(resultado.Items, vehiculo =>
+            Assert.Contains(vehiculo.Estado, new[] { nameof(EstadoOperativo.EnTaller), nameof(EstadoOperativo.EnLavado) }));
+    }
+
+    [Fact]
+    public async Task GetCatalogoAsync_FiltradoPorVendido_MuestraLosVendidos()
+    {
+        var vehiculos = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(0, "Kia", "Rio", "VEN-1000", "3AUTST24000000110", EstadoOperativo.Vendido),
+            CrearVehiculoParaBusqueda(1, "Ford", "Explorer", "VEN-1001", "3AUTST24000000111", EstadoOperativo.Vendido),
+            CrearVehiculoParaBusqueda(2, "Toyota", "Corolla", "ABC-1002", "3AUTST24000000112", EstadoOperativo.Disponible),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var resultado = await _vehiculosService.GetCatalogoAsync(
+            estados: [EstadoOperativo.Vendido]);
+
+        Assert.Equal(2, resultado.TotalCount);
+        Assert.All(resultado.Items, vehiculo => Assert.Equal(nameof(EstadoOperativo.Vendido), vehiculo.Estado));
+    }
+
+    [Fact]
+    public async Task GetCatalogoAsync_FiltradoPorPrecioRango_EsInclusivoEnLosExtremos()
+    {
+        var vehiculos = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(0, "Nissan", "Versa", "ABC-1000", "3AUTST24000000120", precio: 200000m),
+            CrearVehiculoParaBusqueda(1, "Mazda", "CX-5", "ABC-1001", "3AUTST24000000121", precio: 300000m),
+            CrearVehiculoParaBusqueda(2, "Honda", "CR-V", "ABC-1002", "3AUTST24000000122", precio: 400000m),
+            CrearVehiculoParaBusqueda(3, "Toyota", "RAV4", "ABC-1003", "3AUTST24000000123", precio: 500000m),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var resultado = await _vehiculosService.GetCatalogoAsync(precioMin: 200000m, precioMax: 400000m);
+
+        Assert.Equal(3, resultado.TotalCount);
+        Assert.Contains(resultado.Items, vehiculo => vehiculo.Precio == 200000m);
+        Assert.Contains(resultado.Items, vehiculo => vehiculo.Precio == 300000m);
+        Assert.Contains(resultado.Items, vehiculo => vehiculo.Precio == 400000m);
+        Assert.DoesNotContain(resultado.Items, vehiculo => vehiculo.Precio == 500000m);
+    }
+
+    [Fact]
+    public async Task GetCatalogoAsync_CombinacionEstadosTipoYPrecio_AplicaTodosLosFiltros()
+    {
+        var vehiculos = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(0, "Kia", "Sportage", "ABC-1000", "3AUTST24000000130", EstadoOperativo.EnTaller, 450000m, TipoVehiculo.Seminuevo),
+            CrearVehiculoParaBusqueda(1, "Kia", "Sonet", "ABC-1001", "3AUTST24000000131", EstadoOperativo.EnTaller, 450000m, TipoVehiculo.Nuevo),
+            CrearVehiculoParaBusqueda(2, "Renault", "Kwid", "ABC-1002", "3AUTST24000000132", EstadoOperativo.EnLavado, 450000m, TipoVehiculo.Seminuevo),
+            CrearVehiculoParaBusqueda(3, "Hyundai", "Tucson", "ABC-1003", "3AUTST24000000133", EstadoOperativo.EnTaller, 600000m, TipoVehiculo.Seminuevo),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var resultado = await _vehiculosService.GetCatalogoAsync(
+            estados: [EstadoOperativo.EnTaller, EstadoOperativo.EnLavado],
+            tipo: TipoVehiculo.Seminuevo,
+            precioMin: 400000m,
+            precioMax: 500000m);
+
+        Assert.Equal(2, resultado.TotalCount);
+        Assert.All(resultado.Items, vehiculo =>
+        {
+            Assert.Contains(vehiculo.Estado, new[] { nameof(EstadoOperativo.EnTaller), nameof(EstadoOperativo.EnLavado) });
+            Assert.Equal(nameof(TipoVehiculo.Seminuevo), vehiculo.Tipo);
+            Assert.InRange(vehiculo.Precio, 400000m, 500000m);
+        });
+    }
+
+    [Fact]
+    public async Task GetConteosRapidosAsync_ExcluyeVendidosYDevuelveConteosCorrectos()
+    {
+        var vehiculos = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST24000000140", EstadoOperativo.Disponible, 300000m, TipoVehiculo.Nuevo),
+            CrearVehiculoParaBusqueda(1, "Mazda", "CX-5", "ABC-1001", "3AUTST24000000141", EstadoOperativo.Disponible, 400000m, TipoVehiculo.Seminuevo),
+            CrearVehiculoParaBusqueda(2, "Kia", "Sportage", "ABC-1002", "3AUTST24000000142", EstadoOperativo.EnTaller, 500000m, TipoVehiculo.Seminuevo),
+            CrearVehiculoParaBusqueda(3, "Ford", "Maverick", "ABC-1003", "3AUTST24000000143", EstadoOperativo.Reservado, 520000m, TipoVehiculo.Nuevo),
+            CrearVehiculoParaBusqueda(4, "Kia", "Rio", "VEN-1004", "3AUTST24000000144", EstadoOperativo.Vendido, 250000m, TipoVehiculo.Seminuevo),
+            CrearVehiculoParaBusqueda(5, "Ford", "Explorer", "VEN-1005", "3AUTST24000000145", EstadoOperativo.Vendido, 700000m, TipoVehiculo.Nuevo),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(vehiculos);
+
+        var resultado = await _vehiculosService.GetConteosRapidosAsync();
+
+        Assert.Equal(4, resultado.Todos);
+        Assert.Equal(2, resultado.Disponibles);
+        Assert.Equal(2, resultado.Seminuevos);
+        Assert.Equal(2, resultado.Nuevos);
     }
 }

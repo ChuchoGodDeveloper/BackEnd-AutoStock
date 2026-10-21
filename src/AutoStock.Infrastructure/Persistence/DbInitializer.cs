@@ -134,6 +134,7 @@ public static class DbInitializer
                     ? null
                     : $"https://cdn.autostock.mx/vehiculos/{dato.Marca}-{dato.Modelo}-{dato.Anio}.jpg".ToLowerInvariant(),
                 Estado = dato.Estado,
+                Tipo = indice % 3 == 0 ? TipoVehiculo.Nuevo : TipoVehiculo.Seminuevo,
                 FechaRegistro = fechaBase.AddMinutes(-indice * 53),
                 VIN = $"3AUTST{(dato.Anio % 100):D2}{(indice + 1):D9}",
                 NumeroStock = $"STK-{(indice + 1):D4}",
