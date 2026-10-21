@@ -20,4 +20,12 @@ public class VehiculoRepository : IVehiculoRepository
             .AsNoTracking()
             .ToListAsync();
     }
+
+    public async Task<Vehiculo?> ObtenerPorIdAsync(Guid id)
+    {
+        return await _context.Vehiculos
+            .AsNoTracking()
+            .Include(v => v.Imagenes)
+            .FirstOrDefaultAsync(v => v.Id == id);
+    }
 }

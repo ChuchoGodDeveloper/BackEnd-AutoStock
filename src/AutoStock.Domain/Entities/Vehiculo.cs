@@ -27,4 +27,24 @@ public class Vehiculo
     public EstadoOperativo Estado { get; set; }
 
     public DateTime FechaRegistro { get; set; }
+
+    public string VIN { get; set; } = string.Empty;
+
+    public string NumeroStock { get; set; } = string.Empty;
+
+    public string? Motor { get; set; }
+
+    public string? Potencia { get; set; }
+
+    public string? Transmision { get; set; }
+
+    public string? ColorExterior { get; set; }
+
+    public string? ColorInterior { get; set; }
+
+    public string? Equipamiento { get; set; }
+
+    public string? NotasInspeccion { get; set; }
+
+    public List<ImagenVehiculo> Imagenes { get; set; } = [];
 }

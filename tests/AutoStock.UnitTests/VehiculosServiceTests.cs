@@ -1,3 +1,4 @@
+using AutoStock.Application.Exceptions;
 using AutoStock.Application.Services;
 using AutoStock.Domain.Entities;
 using AutoStock.Domain.Enums;
@@ -146,5 +147,88 @@ public class VehiculosServiceTests
         Assert.Equal(20, resultado.PageSize);
         Assert.Equal(20, resultado.Items.Count);
         Assert.Equal(25, resultado.TotalCount);
+    }
+
+    private static Vehiculo CrearVehiculoConFicha(Guid id, int cantidadImagenes)
+    {
+        var vehiculo = new Vehiculo
+        {
+            Id = id,
+            Marca = "Toyota",
+            Modelo = "Corolla",
+            Anio = 2024,
+            Precio = 389900m,
+            Kilometraje = 18500,
+            Placa = "ABC-1234",
+            ZonaLote = "Z1",
+            CajonLote = "A01",
+            FotoPrincipalUrl = "https://cdn.autostock.mx/vehiculos/toyota-corolla-2024.jpg",
+            Estado = EstadoOperativo.Disponible,
+            FechaRegistro = new DateTime(2026, 10, 20, 9, 0, 0, DateTimeKind.Utc),
+            VIN = "3AUTST24000000001",
+            NumeroStock = "STK-0001",
+            Motor = "2.0L 4 cilindros",
+            Potencia = "150 HP",
+            Transmision = "Automática",
+            ColorExterior = "Blanco",
+            ColorInterior = "Negro",
+            Equipamiento = "Aire acondicionado, cámara de reversa",
+            NotasInspeccion = "Sin daños estructurales",
+        };
+
+        for (var indice = 0; indice < cantidadImagenes; indice++)
+        {
+            vehiculo.Imagenes.Add(new ImagenVehiculo
+            {
+                Id = Guid.Parse($"00000000-0000-0000-0002-{(indice + 1).ToString("D12")}"),
+                VehiculoId = id,
+                Url = $"https://cdn.autostock.mx/vehiculos/toyota-corolla-2024-v{indice + 1}.jpg",
+                EsPrincipal = indice == 0,
+                Orden = indice,
+            });
+        }
+
+        return vehiculo;
+    }
+
+    [Fact]
+    public async Task GetVehiculoByIdAsync_IdExistente_DevuelveDtoConTodasSusImagenes()
+    {
+        var id = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var vehiculo = CrearVehiculoConFicha(id, cantidadImagenes: 4);
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(id))
+            .ReturnsAsync(vehiculo);
+
+        var resultado = await _vehiculosService.GetVehiculoByIdAsync(id);
+
+        Assert.Equal(id, resultado.Id);
+        Assert.Equal("Toyota", resultado.Marca);
+        Assert.Equal("Corolla", resultado.Modelo);
+        Assert.Equal("3AUTST24000000001", resultado.VIN);
+        Assert.Equal("STK-0001", resultado.NumeroStock);
+        Assert.Equal("2.0L 4 cilindros", resultado.Motor);
+        Assert.Equal("150 HP", resultado.Potencia);
+        Assert.Equal("Automática", resultado.Transmision);
+        Assert.Equal("Blanco", resultado.ColorExterior);
+        Assert.Equal("Negro", resultado.ColorInterior);
+        Assert.Equal("Aire acondicionado, cámara de reversa", resultado.Equipamiento);
+        Assert.Equal("Sin daños estructurales", resultado.NotasInspeccion);
+        Assert.Equal(4, resultado.Imagenes.Count);
+        Assert.True(resultado.Imagenes[0].EsPrincipal);
+        Assert.All(resultado.Imagenes, imagen => Assert.StartsWith("https://", imagen.Url));
+    }
+
+    [Fact]
+    public async Task GetVehiculoByIdAsync_IdInexistente_LanzaNotFoundException()
+    {
+        var id = Guid.Parse("00000000-0000-0000-0000-000000000999");
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(id))
+            .ReturnsAsync((Vehiculo?)null);
+
+        await Assert.ThrowsAsync<NotFoundException>(() => _vehiculosService.GetVehiculoByIdAsync(id));
     }
 }

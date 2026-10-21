@@ -54,8 +54,48 @@ public class VehiculoConfiguration : IEntityTypeConfiguration<Vehiculo>
             .IsRequired()
             .HasColumnType("datetime2");
 
+        builder.Property(v => v.VIN)
+            .IsRequired()
+            .HasMaxLength(17);
+
+        builder.Property(v => v.NumeroStock)
+            .IsRequired()
+            .HasMaxLength(20);
+
+        builder.Property(v => v.Motor)
+            .HasMaxLength(100);
+
+        builder.Property(v => v.Potencia)
+            .HasMaxLength(50);
+
+        builder.Property(v => v.Transmision)
+            .HasMaxLength(50);
+
+        builder.Property(v => v.ColorExterior)
+            .HasMaxLength(50);
+
+        builder.Property(v => v.ColorInterior)
+            .HasMaxLength(50);
+
+        builder.Property(v => v.Equipamiento)
+            .HasMaxLength(500);
+
+        builder.Property(v => v.NotasInspeccion)
+            .HasMaxLength(1000);
+
+        builder.HasMany(v => v.Imagenes)
+            .WithOne(i => i.Vehiculo)
+            .HasForeignKey(i => i.VehiculoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(v => v.Estado);
 
         builder.HasIndex(v => v.FechaRegistro);
+
+        builder.HasIndex(v => v.VIN)
+            .IsUnique();
+
+        builder.HasIndex(v => v.NumeroStock)
+            .IsUnique();
     }
 }

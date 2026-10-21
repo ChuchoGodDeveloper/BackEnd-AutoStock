@@ -36,6 +36,10 @@ public class ExceptionHandlingMiddleware
         {
             await WriteErrorResponseAsync(context, StatusCodes.Status403Forbidden, ex.Message);
         }
+        catch (NotFoundException ex)
+        {
+            await WriteErrorResponseAsync(context, StatusCodes.Status404NotFound, ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error no controlado");

@@ -22,6 +22,32 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.ImagenVehiculo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("EsPrincipal")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Orden")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("VehiculoId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VehiculoId");
+
+                    b.ToTable("ImagenesVehiculo", (string)null);
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.Rol", b =>
                 {
                     b.Property<int>("Id")
@@ -156,6 +182,18 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("ColorExterior")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ColorInterior")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Equipamiento")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<int>("Estado")
                         .HasColumnType("int");
 
@@ -179,12 +217,38 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("Motor")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("NotasInspeccion")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("NumeroStock")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<string>("Placa")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("Potencia")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<decimal>("Precio")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Transmision")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("VIN")
+                        .IsRequired()
+                        .HasMaxLength(17)
+                        .HasColumnType("nvarchar(17)");
 
                     b.Property<string>("ZonaLote")
                         .IsRequired()
@@ -197,7 +261,24 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("FechaRegistro");
 
+                    b.HasIndex("NumeroStock")
+                        .IsUnique();
+
+                    b.HasIndex("VIN")
+                        .IsUnique();
+
                     b.ToTable("Vehiculos", (string)null);
+                });
+
+            modelBuilder.Entity("AutoStock.Domain.Entities.ImagenVehiculo", b =>
+                {
+                    b.HasOne("AutoStock.Domain.Entities.Vehiculo", "Vehiculo")
+                        .WithMany("Imagenes")
+                        .HasForeignKey("VehiculoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vehiculo");
                 });
 
             modelBuilder.Entity("AutoStock.Domain.Entities.Sesion", b =>
@@ -230,6 +311,11 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("AutoStock.Domain.Entities.Usuario", b =>
                 {
                     b.Navigation("Sesiones");
+                });
+
+            modelBuilder.Entity("AutoStock.Domain.Entities.Vehiculo", b =>
+                {
+                    b.Navigation("Imagenes");
                 });
 #pragma warning restore 612, 618
         }

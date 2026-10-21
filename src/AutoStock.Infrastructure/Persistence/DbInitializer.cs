@@ -103,6 +103,9 @@ public static class DbInitializer
         }
     }
 
+    private static readonly string[] ColoresExterior = ["Blanco", "Negro", "Gris", "Azul", "Rojo"];
+    private static readonly string[] ColoresInterior = ["Negro", "Beige", "Gris"];
+
     private static List<Vehiculo> CrearVehiculosDePrueba()
     {
         var fechaBase = new DateTime(2026, 10, 20, 9, 0, 0, DateTimeKind.Utc);
@@ -113,8 +116,10 @@ public static class DbInitializer
             var dato = CatalogoPrueba[indice];
             var sinFoto = indice % 5 == 2;
             var sinPlaca = indice % 7 == 3;
+            var sinFichaTecnica = indice % 5 == 2;
+            var cilindros = (indice % 2) == 0 ? "4" : "6";
 
-            vehiculos.Add(new Vehiculo
+            var vehiculo = new Vehiculo
             {
                 Id = Guid.Parse($"00000000-0000-0000-0000-{(indice + 1).ToString("D12")}"),
                 Marca = dato.Marca,
@@ -130,7 +135,43 @@ public static class DbInitializer
                     : $"https://cdn.autostock.mx/vehiculos/{dato.Marca}-{dato.Modelo}-{dato.Anio}.jpg".ToLowerInvariant(),
                 Estado = dato.Estado,
                 FechaRegistro = fechaBase.AddMinutes(-indice * 53),
-            });
+                VIN = $"3AUTST{(dato.Anio % 100):D2}{(indice + 1):D9}",
+                NumeroStock = $"STK-{(indice + 1):D4}",
+                Motor = sinFichaTecnica
+                    ? null
+                    : $"{(indice % 4) + 1}.{(indice * 3) % 10}L {cilindros} cilindros",
+                Potencia = sinFichaTecnica ? null : $"{100 + (indice % 8) * 25} HP",
+                Transmision = sinFichaTecnica ? null : ((indice % 2) == 0 ? "Automática" : "Manual"),
+                ColorExterior = sinFichaTecnica ? null : ColoresExterior[indice % ColoresExterior.Length],
+                ColorInterior = sinFichaTecnica ? null : ColoresInterior[indice % ColoresInterior.Length],
+                Equipamiento = sinFichaTecnica
+                    ? null
+                    : "Aire acondicionado, dirección asistida, ventanillas eléctricas, frenos ABS, airbags, sistema de audio con pantalla táctil y cámara de reversa",
+                NotasInspeccion = sinFichaTecnica
+                    ? null
+                    : $"Inspección completada el {fechaBase.AddDays(-indice):dd/MM/yyyy}. Sin daños estructurales ni reparaciones previas relevantes.",
+            };
+
+            if (!sinFichaTecnica)
+            {
+                var cantidadImagenes = 2 + (indice % 5);
+
+                for (var numeroImagen = 0; numeroImagen < cantidadImagenes; numeroImagen++)
+                {
+                    vehiculo.Imagenes.Add(new ImagenVehiculo
+                    {
+                        Id = Guid.Parse($"00000000-0000-0000-0001-{(indice + 1).ToString("D6")}{(numeroImagen + 1).ToString("D6")}"),
+                        VehiculoId = vehiculo.Id,
+                        Url = numeroImagen == 0
+                            ? $"https://cdn.autostock.mx/vehiculos/{dato.Marca}-{dato.Modelo}-{dato.Anio}.jpg".ToLowerInvariant()
+                            : $"https://cdn.autostock.mx/vehiculos/{dato.Marca}-{dato.Modelo}-{dato.Anio}-v{numeroImagen + 1}.jpg".ToLowerInvariant(),
+                        EsPrincipal = numeroImagen == 0,
+                        Orden = numeroImagen,
+                    });
+                }
+            }
+
+            vehiculos.Add(vehiculo);
         }
 
         return vehiculos;

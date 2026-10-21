@@ -25,4 +25,11 @@ public class VehiculosController : ControllerBase
         var resultado = await _vehiculosService.GetCatalogoAsync(page, pageSize);
         return Ok(resultado);
     }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<VehiculoDetalleDto>> GetVehiculoById(Guid id)
+    {
+        var resultado = await _vehiculosService.GetVehiculoByIdAsync(id);
+        return Ok(resultado);
+    }
 }

@@ -18,6 +18,8 @@ public class AutoStockDbContext : DbContext
 
     public DbSet<Vehiculo> Vehiculos => Set<Vehiculo>();
 
+    public DbSet<ImagenVehiculo> ImagenesVehiculo => Set<ImagenVehiculo>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

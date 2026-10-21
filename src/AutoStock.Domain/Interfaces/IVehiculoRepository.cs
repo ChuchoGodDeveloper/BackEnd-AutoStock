@@ -5,4 +5,6 @@ namespace AutoStock.Domain.Interfaces;
 public interface IVehiculoRepository
 {
     Task<IReadOnlyList<Vehiculo>> ObtenerTodosAsync();
+
+    Task<Vehiculo?> ObtenerPorIdAsync(Guid id);
 }
