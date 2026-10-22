@@ -10,6 +10,8 @@ public class VehiculoDetalleDto
 
     public int Anio { get; set; }
 
+    public string? Version { get; set; }
+
     public decimal Precio { get; set; }
 
     public int Kilometraje { get; set; }
@@ -24,7 +26,11 @@ public class VehiculoDetalleDto
 
     public string Estado { get; set; } = string.Empty;
 
+    public string Tipo { get; set; } = string.Empty;
+
     public DateTime FechaRegistro { get; set; }
+
+    public string? RegistradoPor { get; set; }
 
     public string VIN { get; set; } = string.Empty;
 

@@ -27,6 +27,9 @@ public class VehiculoConfiguration : IEntityTypeConfiguration<Vehiculo>
         builder.Property(v => v.Anio)
             .IsRequired();
 
+        builder.Property(v => v.Version)
+            .HasMaxLength(100);
+
         builder.Property(v => v.Precio)
             .IsRequired()
             .HasColumnType("decimal(18,2)");
@@ -58,6 +61,9 @@ public class VehiculoConfiguration : IEntityTypeConfiguration<Vehiculo>
         builder.Property(v => v.FechaRegistro)
             .IsRequired()
             .HasColumnType("datetime2");
+
+        builder.Property(v => v.RegistradoPor)
+            .HasMaxLength(150);
 
         builder.Property(v => v.VIN)
             .IsRequired()

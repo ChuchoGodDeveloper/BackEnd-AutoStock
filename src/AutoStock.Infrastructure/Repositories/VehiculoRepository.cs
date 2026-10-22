@@ -28,4 +28,16 @@ public class VehiculoRepository : IVehiculoRepository
             .Include(v => v.Imagenes)
             .FirstOrDefaultAsync(v => v.Id == id);
     }
+
+    public async Task<Vehiculo?> ObtenerPorVinAsync(string vin)
+    {
+        return await _context.Vehiculos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(v => v.VIN == vin);
+    }
+
+    public async Task AgregarAsync(Vehiculo vehiculo)
+    {
+        await _context.Vehiculos.AddAsync(vehiculo);
+    }
 }
