@@ -41,13 +41,10 @@ public static class DbInitializer
     {
         if (!await context.Roles.AnyAsync())
         {
-            var roles = new List<Rol>
-            {
-                new() { Id = 1, Nombre = "Administrador", Descripcion = "Acceso total al sistema" },
-                new() { Id = 2, Nombre = "Gerente de Ventas", Descripcion = "Gestión y supervisión de ventas" },
-                new() { Id = 3, Nombre = "Encargado de Lote y Recepción", Descripcion = "Administración de lotes y recepción de mercancía" },
-                new() { Id = 4, Nombre = "Asesor de Ventas", Descripcion = "Atención y asesoría a clientes" },
-            };
+            var rolAdmin = new Rol { Nombre = "Administrador", Descripcion = "Acceso total al sistema" };
+            var rolGerente = new Rol { Nombre = "Gerente de Ventas", Descripcion = "Gestión y supervisión de ventas" };
+            var rolEncargado = new Rol { Nombre = "Encargado de Lote y Recepción", Descripcion = "Administración de lotes y recepción de mercancía" };
+            var rolAsesor = new Rol { Nombre = "Asesor de Ventas", Descripcion = "Atención y asesoría a clientes" };
 
             var usuarios = new List<Usuario>
             {
@@ -57,7 +54,7 @@ public static class DbInitializer
                     Correo = "admin@autostock.com",
                     NombreCompleto = "Carlos Ramírez",
                     PasswordHash = passwordHasher.Hash("AdminAutoStock2026!"),
-                    RolId = 1,
+                    Rol = rolAdmin,
                     Activo = true,
                     IntentosFallidos = 0,
                     BloqueadoHasta = null,
@@ -69,7 +66,7 @@ public static class DbInitializer
                     Correo = "asesor@autostock.com",
                     NombreCompleto = "Marcos Hernández",
                     PasswordHash = passwordHasher.Hash("AsesorAutoStock2026!"),
-                    RolId = 4,
+                    Rol = rolAsesor,
                     Activo = true,
                     IntentosFallidos = 0,
                     BloqueadoHasta = null,
@@ -81,7 +78,7 @@ public static class DbInitializer
                     Correo = "inactivo@autostock.com",
                     NombreCompleto = "Usuario Inactivo",
                     PasswordHash = passwordHasher.Hash("Inactivo2026!"),
-                    RolId = 4,
+                    Rol = rolAsesor,
                     Activo = false,
                     IntentosFallidos = 0,
                     BloqueadoHasta = null,
@@ -89,7 +86,7 @@ public static class DbInitializer
                 },
             };
 
-            context.Roles.AddRange(roles);
+            context.Roles.AddRange(rolAdmin, rolGerente, rolEncargado, rolAsesor);
             context.Usuarios.AddRange(usuarios);
 
             await context.SaveChangesAsync();
