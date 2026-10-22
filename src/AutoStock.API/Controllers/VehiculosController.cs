@@ -1,0 +1,115 @@
+using System.Security.Claims;
+using AutoStock.Application.DTOs;
+using AutoStock.Application.Interfaces;
+using AutoStock.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace AutoStock.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class VehiculosController : ControllerBase
+{
+    private readonly IVehiculosService _vehiculosService;
+
+    public VehiculosController(IVehiculosService vehiculosService)
+    {
+        _vehiculosService = vehiculosService;
+    }
+
+    [HttpGet("catalogo")]
+    public async Task<ActionResult<PaginatedResult<VehiculoDto>>> GetCatalogo(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? busqueda = null,
+        [FromQuery(Name = "estados[]")] List<EstadoOperativo>? estados = null,
+        [FromQuery] TipoVehiculo? tipo = null,
+        [FromQuery] decimal? precioMin = null,
+        [FromQuery] decimal? precioMax = null)
+    {
+        var resultado = await _vehiculosService.GetCatalogoAsync(
+            page, pageSize, busqueda, estados, tipo, precioMin, precioMax);
+        return Ok(resultado);
+    }
+
+    [HttpGet("conteos-rapidos")]
+    public async Task<ActionResult<ConteosRapidosDto>> GetConteosRapidos()
+    {
+        var resultado = await _vehiculosService.GetConteosRapidosAsync();
+        return Ok(resultado);
+    }
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<VehiculoDetalleDto>> GetVehiculoById(Guid id)
+    {
+        var resultado = await _vehiculosService.GetVehiculoByIdAsync(id);
+        return Ok(resultado);
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Encargado de Lote y Recepción,Administrador")]
+    public async Task<ActionResult<VehiculoDetalleDto>> RegistrarVehiculo(
+        [FromBody] RegistrarVehiculoDto dto)
+    {
+        var registradoPor = User.FindFirst("nombre")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? "Encargado de Lote";
+
+        var creado = await _vehiculosService.RegistrarVehiculoAsync(dto, registradoPor);
+        return CreatedAtAction(nameof(GetVehiculoById), new { id = creado.Id }, creado);
+    }
+
+    [HttpPost("{id:guid}/fotografias")]
+    [Authorize(Roles = "Encargado de Lote y Recepción,Administrador")]
+    public async Task<ActionResult<VehiculoDetalleDto>> GuardarFotografia(
+        Guid id,
+        [FromBody] GuardarFotografiaDto dto)
+    {
+        var capturadaPor = User.FindFirst("nombre")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? "Encargado de Lote";
+
+        var actualizado = await _vehiculosService.GuardarFotografiaAsync(id, dto, capturadaPor);
+        return Ok(actualizado);
+    }
+
+    [HttpDelete("{id:guid}/fotografias/{imagenId:guid}")]
+    [Authorize(Roles = "Encargado de Lote y Recepción,Administrador")]
+    public async Task<ActionResult<VehiculoDetalleDto>> EliminarFotografia(
+        Guid id,
+        Guid imagenId)
+    {
+        var actualizado = await _vehiculosService.EliminarFotografiaAsync(id, imagenId);
+        return Ok(actualizado);
+    }
+
+    [HttpPatch("{id:guid}/estado")]
+    [HttpPut("{id:guid}/estado")]
+    public async Task<ActionResult<VehiculoDetalleDto>> CambiarEstadoOperativo(
+        Guid id,
+        [FromBody] CambiarEstadoOperativoDto dto)
+    {
+        var sub = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? usuarioId = int.TryParse(sub, out var parsedId) ? parsedId : null;
+
+        var nombreUsuario = User.FindFirst("nombre")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? "Usuario";
+
+        var rolUsuario = User.FindFirst(ClaimTypes.Role)?.Value
+            ?? User.FindFirst("role")?.Value
+            ?? string.Empty;
+
+        var actualizado = await _vehiculosService.CambiarEstadoOperativoAsync(
+            id,
+            dto,
+            usuarioId,
+            nombreUsuario,
+            rolUsuario);
+
+        return Ok(actualizado);
+    }
+}
