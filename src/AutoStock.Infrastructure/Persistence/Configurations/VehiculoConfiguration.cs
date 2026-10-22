@@ -64,6 +64,22 @@ public class VehiculoConfiguration : IEntityTypeConfiguration<Vehiculo>
         builder.Property(v => v.RegistradoPor)
             .HasMaxLength(150);
 
+        builder.Property(v => v.FechaCambioEstado)
+            .HasColumnType("datetime2");
+
+        builder.Property(v => v.EstadoActualizadoPor)
+            .HasMaxLength(150);
+
+        builder.Property(v => v.EstadoActualizadoPorUsuarioId);
+
+        builder.Property(v => v.ResponsableTestDrive)
+            .HasMaxLength(150);
+
+        builder.Property(v => v.ReservadoPorUsuarioId);
+
+        builder.Property(v => v.ReservadoPorNombre)
+            .HasMaxLength(150);
+
         builder.Property(v => v.VIN)
             .IsRequired()
             .HasMaxLength(17);
@@ -96,6 +112,11 @@ public class VehiculoConfiguration : IEntityTypeConfiguration<Vehiculo>
         builder.HasMany(v => v.Imagenes)
             .WithOne(i => i.Vehiculo)
             .HasForeignKey(i => i.VehiculoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(v => v.HistorialEstados)
+            .WithOne(h => h.Vehiculo)
+            .HasForeignKey(h => h.VehiculoId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(v => v.Estado);

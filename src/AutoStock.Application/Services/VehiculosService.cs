@@ -135,6 +135,18 @@ public class VehiculosService : IVehiculosService
         };
     }
 
+    public async Task<ResumenMetricasDto> GetResumenMetricasAsync()
+    {
+        var vehiculos = await _vehiculoRepository.ObtenerTodosAsync();
+
+        return new ResumenMetricasDto
+        {
+            Disponibles = vehiculos.Count(v => v.Estado == EstadoOperativo.Disponible),
+            PruebaDeManejo = vehiculos.Count(v => v.Estado == EstadoOperativo.TestDrive),
+            EnTaller = vehiculos.Count(v => v.Estado == EstadoOperativo.EnTaller),
+        };
+    }
+
     public async Task<VehiculoDetalleDto> GetVehiculoByIdAsync(Guid id)
     {
         var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(id);
@@ -243,6 +255,9 @@ public class VehiculosService : IVehiculosService
         }
 
         var numeroStock = GenerarSiguienteNumeroStock(vehiculosExistentes);
+        var autorRegistro = string.IsNullOrWhiteSpace(registradoPor)
+            ? "Encargado de Lote"
+            : registradoPor.Trim();
 
         var nuevoVehiculo = new Vehiculo
         {
@@ -268,9 +283,9 @@ public class VehiculosService : IVehiculosService
             ZonaLote = dto.ZonaLote.Trim().ToUpperInvariant(),
             CajonLote = dto.CajonLote.Trim().ToUpperInvariant(),
             FechaRegistro = DateTime.UtcNow,
-            RegistradoPor = string.IsNullOrWhiteSpace(registradoPor)
-                ? "Encargado de Lote"
-                : registradoPor.Trim(),
+            RegistradoPor = autorRegistro,
+            ResponsableTestDrive = dto.Estado == EstadoOperativo.TestDrive ? autorRegistro : null,
+            ReservadoPorNombre = dto.Estado == EstadoOperativo.Reservado ? autorRegistro : null,
         };
 
         await _vehiculoRepository.AgregarAsync(nuevoVehiculo);
@@ -373,6 +388,119 @@ public class VehiculosService : IVehiculosService
         }
 
         await _vehiculoRepository.EliminarImagenAsync(vehiculo, imagen);
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        return CrearDetalleDto(vehiculo);
+    }
+
+    public async Task<VehiculoDetalleDto> CambiarEstadoOperativoAsync(
+        Guid vehiculoId,
+        CambiarEstadoOperativoDto dto,
+        int? usuarioId,
+        string nombreUsuario,
+        string rolUsuario)
+    {
+        var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
+        if (vehiculo is null)
+        {
+            throw new NotFoundException("Vehículo no encontrado");
+        }
+
+        if (vehiculo.Estado == EstadoOperativo.Vendido)
+        {
+            throw new ValidationAppException(
+                "Una unidad vendida no puede cambiar de estado desde esta pantalla");
+        }
+
+        if (!Enum.IsDefined(dto.NuevoEstado) || dto.NuevoEstado == EstadoOperativo.Vendido)
+        {
+            throw new ValidationAppException(
+                "El estado Vendido solo puede asignarse mediante el registro de venta");
+        }
+
+        if (dto.NuevoEstado == vehiculo.Estado)
+        {
+            throw new ValidationAppException(
+                "Para cambiar el estado debe elegirse uno distinto al actual");
+        }
+
+        var nombreLimpio = string.IsNullOrWhiteSpace(nombreUsuario)
+            ? "Usuario"
+            : nombreUsuario.Trim();
+        var rolLimpio = rolUsuario?.Trim() ?? string.Empty;
+
+        var esGerenteOAdmin =
+            string.Equals(rolLimpio, "Gerente de Ventas", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(rolLimpio, "Administrador", StringComparison.OrdinalIgnoreCase);
+
+        if (vehiculo.Estado == EstadoOperativo.Reservado && !esGerenteOAdmin)
+        {
+            var tieneDuenoReserva =
+                vehiculo.ReservadoPorUsuarioId.HasValue ||
+                !string.IsNullOrWhiteSpace(vehiculo.ReservadoPorNombre);
+
+            var esMismoUsuarioPorId =
+                vehiculo.ReservadoPorUsuarioId.HasValue &&
+                usuarioId.HasValue &&
+                vehiculo.ReservadoPorUsuarioId.Value == usuarioId.Value;
+
+            var esMismoUsuarioPorNombre =
+                !vehiculo.ReservadoPorUsuarioId.HasValue &&
+                !string.IsNullOrWhiteSpace(vehiculo.ReservadoPorNombre) &&
+                string.Equals(vehiculo.ReservadoPorNombre, nombreLimpio, StringComparison.OrdinalIgnoreCase);
+
+            if (tieneDuenoReserva && !esMismoUsuarioPorId && !esMismoUsuarioPorNombre)
+            {
+                throw new ValidationAppException(
+                    $"Esta unidad fue reservada por {vehiculo.ReservadoPorNombre ?? "otro usuario"}. Solo quien la reservó, el Gerente de Ventas o el Administrador pueden cambiar su estado.");
+            }
+        }
+
+        var estadoAnterior = vehiculo.Estado;
+        var fechaCambio = DateTime.UtcNow;
+
+        vehiculo.Estado = dto.NuevoEstado;
+        vehiculo.FechaCambioEstado = fechaCambio;
+        vehiculo.EstadoActualizadoPor = nombreLimpio;
+        vehiculo.EstadoActualizadoPorUsuarioId = usuarioId;
+
+        if (dto.NuevoEstado == EstadoOperativo.TestDrive)
+        {
+            vehiculo.ResponsableTestDrive = nombreLimpio;
+            vehiculo.ReservadoPorUsuarioId = null;
+            vehiculo.ReservadoPorNombre = null;
+        }
+        else if (dto.NuevoEstado == EstadoOperativo.Reservado)
+        {
+            vehiculo.ReservadoPorUsuarioId = usuarioId;
+            vehiculo.ReservadoPorNombre = nombreLimpio;
+            vehiculo.ResponsableTestDrive = null;
+        }
+        else
+        {
+            vehiculo.ResponsableTestDrive = null;
+            vehiculo.ReservadoPorUsuarioId = null;
+            vehiculo.ReservadoPorNombre = null;
+        }
+
+        var registroHistorial = new HistorialEstadoVehiculo
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            EstadoAnterior = estadoAnterior,
+            EstadoNuevo = dto.NuevoEstado,
+            UsuarioId = usuarioId,
+            CambiadoPor = nombreLimpio,
+            FechaCambio = fechaCambio,
+        };
+
+        vehiculo.HistorialEstados.Insert(0, registroHistorial);
+
+        await _vehiculoRepository.RegistrarCambioEstadoAsync(vehiculo, registroHistorial);
 
         if (_unitOfWork is not null)
         {
@@ -533,6 +661,12 @@ public class VehiculosService : IVehiculosService
             Tipo = vehiculo.Tipo.ToString(),
             FechaRegistro = vehiculo.FechaRegistro,
             RegistradoPor = vehiculo.RegistradoPor,
+            FechaCambioEstado = vehiculo.FechaCambioEstado,
+            EstadoActualizadoPor = vehiculo.EstadoActualizadoPor,
+            EstadoActualizadoPorUsuarioId = vehiculo.EstadoActualizadoPorUsuarioId,
+            ResponsableTestDrive = vehiculo.ResponsableTestDrive,
+            ReservadoPorUsuarioId = vehiculo.ReservadoPorUsuarioId,
+            ReservadoPorNombre = vehiculo.ReservadoPorNombre,
             VIN = vehiculo.VIN,
             NumeroStock = vehiculo.NumeroStock,
             Motor = vehiculo.Motor,
@@ -557,6 +691,18 @@ public class VehiculosService : IVehiculosService
                     TipoToma = imagen.TipoToma,
                     FechaCaptura = imagen.FechaCaptura,
                     CapturadaPor = imagen.CapturadaPor,
+                })
+                .ToList(),
+            HistorialEstados = vehiculo.HistorialEstados
+                .OrderByDescending(h => h.FechaCambio)
+                .Select(h => new HistorialEstadoDto
+                {
+                    Id = h.Id,
+                    EstadoAnterior = h.EstadoAnterior.ToString(),
+                    EstadoNuevo = h.EstadoNuevo.ToString(),
+                    UsuarioId = h.UsuarioId,
+                    CambiadoPor = h.CambiadoPor,
+                    FechaCambio = h.FechaCambio,
                 })
                 .ToList(),
         };

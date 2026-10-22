@@ -807,4 +807,198 @@ public class VehiculosServiceTests
         await Assert.ThrowsAsync<NotFoundException>(
             () => _vehiculosService.EliminarFotografiaAsync(vehiculo.Id, Guid.NewGuid()));
     }
+
+    [Fact]
+    public async Task CambiarEstadoOperativoAsync_CambioATestDrive_RegistraHistorialYResponsableTestDrive()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "ABC-1000", "3AUTST25000000901");
+        vehiculo.Estado = EstadoOperativo.Disponible;
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new CambiarEstadoOperativoDto
+        {
+            NuevoEstado = EstadoOperativo.TestDrive,
+        };
+
+        var resultado = await _vehiculosService.CambiarEstadoOperativoAsync(
+            vehiculo.Id,
+            dto,
+            usuarioId: 2,
+            nombreUsuario: "Marcos Hernández",
+            rolUsuario: "Asesor de Ventas");
+
+        Assert.Equal(nameof(EstadoOperativo.TestDrive), resultado.Estado);
+        Assert.Equal("Marcos Hernández", resultado.ResponsableTestDrive);
+        Assert.Equal("Marcos Hernández", resultado.EstadoActualizadoPor);
+        Assert.NotNull(resultado.FechaCambioEstado);
+        var historial = Assert.Single(resultado.HistorialEstados);
+        Assert.Equal(nameof(EstadoOperativo.Disponible), historial.EstadoAnterior);
+        Assert.Equal(nameof(EstadoOperativo.TestDrive), historial.EstadoNuevo);
+        Assert.Equal("Marcos Hernández", historial.CambiadoPor);
+        _vehiculoRepositoryMock.Verify(
+            repo => repo.RegistrarCambioEstadoAsync(vehiculo, It.IsAny<HistorialEstadoVehiculo>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CambiarEstadoOperativoAsync_CambioAReservado_RegistraUsuarioQueReservo()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "ABC-1000", "3AUTST25000000902");
+        vehiculo.Estado = EstadoOperativo.Disponible;
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new CambiarEstadoOperativoDto
+        {
+            NuevoEstado = EstadoOperativo.Reservado,
+        };
+
+        var resultado = await _vehiculosService.CambiarEstadoOperativoAsync(
+            vehiculo.Id,
+            dto,
+            usuarioId: 4,
+            nombreUsuario: "Marcos Hernández",
+            rolUsuario: "Asesor de Ventas");
+
+        Assert.Equal(nameof(EstadoOperativo.Reservado), resultado.Estado);
+        Assert.Equal(4, resultado.ReservadoPorUsuarioId);
+        Assert.Equal("Marcos Hernández", resultado.ReservadoPorNombre);
+        Assert.Null(resultado.ResponsableTestDrive);
+    }
+
+    [Fact]
+    public async Task CambiarEstadoOperativoAsync_MismoEstadoActual_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "ABC-1000", "3AUTST25000000903");
+        vehiculo.Estado = EstadoOperativo.EnTaller;
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new CambiarEstadoOperativoDto
+        {
+            NuevoEstado = EstadoOperativo.EnTaller,
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.CambiarEstadoOperativoAsync(
+                vehiculo.Id,
+                dto,
+                2,
+                "Delia Leslie",
+                "Encargado de Lote y Recepción"));
+
+        Assert.Contains("distinto al actual", ex.Message);
+    }
+
+    [Fact]
+    public async Task CambiarEstadoOperativoAsync_IntentarMarcarComoVendido_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "ABC-1000", "3AUTST25000000904");
+        vehiculo.Estado = EstadoOperativo.Disponible;
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new CambiarEstadoOperativoDto
+        {
+            NuevoEstado = EstadoOperativo.Vendido,
+        };
+
+        await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.CambiarEstadoOperativoAsync(
+                vehiculo.Id,
+                dto,
+                1,
+                "Carlos Ramírez",
+                "Administrador"));
+    }
+
+    [Fact]
+    public async Task CambiarEstadoOperativoAsync_VehiculoYaVendido_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "ABC-1000", "3AUTST25000000905");
+        vehiculo.Estado = EstadoOperativo.Vendido;
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new CambiarEstadoOperativoDto
+        {
+            NuevoEstado = EstadoOperativo.Disponible,
+        };
+
+        await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.CambiarEstadoOperativoAsync(
+                vehiculo.Id,
+                dto,
+                1,
+                "Carlos Ramírez",
+                "Administrador"));
+    }
+
+    [Fact]
+    public async Task CambiarEstadoOperativoAsync_ReservadoPorOtroUsuarioSiendoAsesor_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "ABC-1000", "3AUTST25000000906");
+        vehiculo.Estado = EstadoOperativo.Reservado;
+        vehiculo.ReservadoPorUsuarioId = 10;
+        vehiculo.ReservadoPorNombre = "Ana Gómez";
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new CambiarEstadoOperativoDto
+        {
+            NuevoEstado = EstadoOperativo.Disponible,
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.CambiarEstadoOperativoAsync(
+                vehiculo.Id,
+                dto,
+                usuarioId: 2,
+                nombreUsuario: "Marcos Hernández",
+                rolUsuario: "Asesor de Ventas"));
+
+        Assert.Contains("Ana Gómez", ex.Message);
+    }
+
+    [Fact]
+    public async Task CambiarEstadoOperativoAsync_ReservadoPorOtroUsuarioSiendoGerenteOAdmin_PermiteLiberarUnidad()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "ABC-1000", "3AUTST25000000907");
+        vehiculo.Estado = EstadoOperativo.Reservado;
+        vehiculo.ReservadoPorUsuarioId = 10;
+        vehiculo.ReservadoPorNombre = "Ana Gómez";
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new CambiarEstadoOperativoDto
+        {
+            NuevoEstado = EstadoOperativo.Disponible,
+        };
+
+        var resultado = await _vehiculosService.CambiarEstadoOperativoAsync(
+            vehiculo.Id,
+            dto,
+            usuarioId: 1,
+            nombreUsuario: "Carlos Ramírez",
+            rolUsuario: "Gerente de Ventas");
+
+        Assert.Equal(nameof(EstadoOperativo.Disponible), resultado.Estado);
+        Assert.Null(resultado.ReservadoPorUsuarioId);
+        Assert.Null(resultado.ReservadoPorNombre);
+    }
 }
