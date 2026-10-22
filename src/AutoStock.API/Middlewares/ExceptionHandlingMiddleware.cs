@@ -22,7 +22,11 @@ public class ExceptionHandlingMiddleware
         }
         catch (ValidationAppException ex)
         {
-            await WriteErrorResponseAsync(context, StatusCodes.Status400BadRequest, ex.Message);
+            await WriteErrorResponseAsync(
+                context,
+                StatusCodes.Status400BadRequest,
+                ex.Message,
+                ex.VehiculoExistenteId);
         }
         catch (AuthenticationFailedException ex)
         {
@@ -50,12 +54,19 @@ public class ExceptionHandlingMiddleware
         }
     }
 
-    private static async Task WriteErrorResponseAsync(HttpContext context, int statusCode, string message)
+    private static async Task WriteErrorResponseAsync(
+        HttpContext context,
+        int statusCode,
+        string message,
+        Guid? vehiculoExistenteId = null)
     {
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = statusCode;
 
-        var payload = JsonSerializer.Serialize(new { mensaje = message });
+        var payload = vehiculoExistenteId.HasValue
+            ? JsonSerializer.Serialize(new { mensaje = message, vehiculoId = vehiculoExistenteId.Value })
+            : JsonSerializer.Serialize(new { mensaje = message });
+
         await context.Response.WriteAsync(payload);
     }
 }

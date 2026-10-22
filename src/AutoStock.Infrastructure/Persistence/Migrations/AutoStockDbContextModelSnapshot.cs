@@ -246,6 +246,10 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Precio")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("RegistradoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<int>("Tipo")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -259,6 +263,10 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(17)
                         .HasColumnType("nvarchar(17)");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("ZonaLote")
                         .IsRequired()

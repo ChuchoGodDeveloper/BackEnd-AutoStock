@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using AutoStock.Application.DTOs;
 using AutoStock.Application.Interfaces;
 using AutoStock.Domain.Enums;
@@ -45,5 +46,18 @@ public class VehiculosController : ControllerBase
     {
         var resultado = await _vehiculosService.GetVehiculoByIdAsync(id);
         return Ok(resultado);
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Encargado de Lote y Recepción,Administrador")]
+    public async Task<ActionResult<VehiculoDetalleDto>> RegistrarVehiculo(
+        [FromBody] RegistrarVehiculoDto dto)
+    {
+        var registradoPor = User.FindFirst("nombre")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? "Encargado de Lote";
+
+        var creado = await _vehiculosService.RegistrarVehiculoAsync(dto, registradoPor);
+        return CreatedAtAction(nameof(GetVehiculoById), new { id = creado.Id }, creado);
     }
 }

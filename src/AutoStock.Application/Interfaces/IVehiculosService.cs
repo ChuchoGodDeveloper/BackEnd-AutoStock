@@ -17,4 +17,6 @@ public interface IVehiculosService
     Task<VehiculoDetalleDto> GetVehiculoByIdAsync(Guid id);
 
     Task<ConteosRapidosDto> GetConteosRapidosAsync();
+
+    Task<VehiculoDetalleDto> RegistrarVehiculoAsync(RegistrarVehiculoDto dto, string registradoPor);
 }

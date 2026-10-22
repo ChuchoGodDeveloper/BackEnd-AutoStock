@@ -1,3 +1,4 @@
+using AutoStock.Application.DTOs;
 using AutoStock.Application.Exceptions;
 using AutoStock.Application.Services;
 using AutoStock.Domain.Entities;
@@ -10,11 +11,14 @@ namespace AutoStock.UnitTests;
 public class VehiculosServiceTests
 {
     private readonly Mock<IVehiculoRepository> _vehiculoRepositoryMock = new();
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly VehiculosService _vehiculosService;
 
     public VehiculosServiceTests()
     {
-        _vehiculosService = new VehiculosService(_vehiculoRepositoryMock.Object);
+        _vehiculosService = new VehiculosService(
+            _vehiculoRepositoryMock.Object,
+            _unitOfWorkMock.Object);
     }
 
     private static Vehiculo CrearVehiculo(int indice, EstadoOperativo estado, DateTime fechaRegistro)
@@ -384,7 +388,7 @@ public class VehiculosServiceTests
         Assert.Equal(2, pagina1.Items.Count);
         Assert.DoesNotContain(pagina1.Items, vehiculo => vehiculo.Estado == nameof(EstadoOperativo.Vendido));
         Assert.DoesNotContain(pagina1.Items, vehiculo => vehiculo.Placa == "VEN-0001");
-        Assert.Equal(1, pagina3.Items.Count);
+        Assert.Single(pagina3.Items);
         Assert.All(pagina1.Items, vehiculo => Assert.Equal("Toyota", vehiculo.Marca));
     }
 
@@ -508,5 +512,126 @@ public class VehiculosServiceTests
         Assert.Equal(2, resultado.Disponibles);
         Assert.Equal(2, resultado.Seminuevos);
         Assert.Equal(2, resultado.Nuevos);
+    }
+
+    private static RegistrarVehiculoDto CrearRegistroValido(
+        TipoVehiculo tipo = TipoVehiculo.Seminuevo)
+    {
+        return new RegistrarVehiculoDto
+        {
+            Tipo = tipo,
+            VIN = "3AUTST25000000999",
+            Marca = "Toyota",
+            Modelo = "Camry",
+            Anio = 2025,
+            Version = "XLE",
+            Placa = tipo == TipoVehiculo.Seminuevo ? "PZG-999-A" : null,
+            Kilometraje = tipo == TipoVehiculo.Seminuevo ? 14500 : 800,
+            Transmision = "Automática",
+            Motor = "2.5L 4 cilindros",
+            Potencia = "203 HP",
+            ColorExterior = "Blanco",
+            ColorInterior = "Negro",
+            Equipamiento = "Pantalla táctil, cámara 360",
+            NotasInspeccion = "Unidad en excelente estado",
+            Precio = 529900m,
+            Estado = EstadoOperativo.Disponible,
+            ZonaLote = "Z2",
+            CajonLote = "B04",
+        };
+    }
+
+    [Fact]
+    public async Task RegistrarVehiculoAsync_SeminuevoValido_GeneraStockConsecutivoYGuarda()
+    {
+        var existentes = new List<Vehiculo>
+        {
+            CrearVehiculoParaBusqueda(24, "Toyota", "Yaris", "ABC-1024", "3AUTST23000000025"),
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(existentes);
+
+        var dto = CrearRegistroValido(TipoVehiculo.Seminuevo);
+
+        var resultado = await _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie");
+
+        Assert.Equal("STK-0026", resultado.NumeroStock);
+        Assert.Equal("3AUTST25000000999", resultado.VIN);
+        Assert.Equal("PZG-999-A", resultado.Placa);
+        Assert.Equal(14500, resultado.Kilometraje);
+        Assert.Equal("Delia Leslie", resultado.RegistradoPor);
+        Assert.Equal("XLE", resultado.Version);
+        _vehiculoRepositoryMock.Verify(repo => repo.AgregarAsync(It.IsAny<Vehiculo>()), Times.Once);
+        _unitOfWorkMock.Verify(uow => uow.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RegistrarVehiculoAsync_NuevoDePlanta_FijaKilometrajeEnCeroYSinPlaca()
+    {
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(new List<Vehiculo>());
+
+        var dto = CrearRegistroValido(TipoVehiculo.Nuevo);
+        dto.Kilometraje = 2500;
+        dto.Placa = "NO-DEBE-GUARDARSE";
+
+        var resultado = await _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie");
+
+        Assert.Equal(0, resultado.Kilometraje);
+        Assert.Null(resultado.Placa);
+        Assert.Equal(nameof(TipoVehiculo.Nuevo), resultado.Tipo);
+        Assert.Equal("STK-0001", resultado.NumeroStock);
+    }
+
+    [Theory]
+    [InlineData("CORT0123")]
+    [InlineData("3AUTST25I00000999")]
+    [InlineData("3AUTST25O00000999")]
+    [InlineData("3AUTST25Q00000999")]
+    public async Task RegistrarVehiculoAsync_VinInvalido_LanzaValidationAppException(string vinInvalido)
+    {
+        var dto = CrearRegistroValido();
+        dto.VIN = vinInvalido;
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie"));
+
+        Assert.Contains("17 caracteres", ex.Message);
+    }
+
+    [Fact]
+    public async Task RegistrarVehiculoAsync_VinDuplicado_LanzaValidationConIdDeUnidadExistente()
+    {
+        var existente = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST25000000999");
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(new List<Vehiculo> { existente });
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorVinAsync("3AUTST25000000999"))
+            .ReturnsAsync(existente);
+
+        var dto = CrearRegistroValido();
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie"));
+
+        Assert.Equal("Ya existe una unidad con ese VIN", ex.Message);
+        Assert.Equal(existente.Id, ex.VehiculoExistenteId);
+    }
+
+    [Fact]
+    public async Task RegistrarVehiculoAsync_EstadoInicialVendido_LanzaValidationAppException()
+    {
+        var dto = CrearRegistroValido();
+        dto.Estado = EstadoOperativo.Vendido;
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie"));
+
+        Assert.Contains("Vendido", ex.Message);
     }
 }
