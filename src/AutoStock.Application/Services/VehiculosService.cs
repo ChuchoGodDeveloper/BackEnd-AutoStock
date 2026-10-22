@@ -13,6 +13,26 @@ public class VehiculosService : IVehiculosService
     private const int TamanioPaginaMaximo = 100;
     private const int LongitudVin = 17;
     private const int AnioMinimo = 1990;
+    private const int MaximoFotografiasPorUnidad = 6;
+    private const int TotalTomasObligatorias = 4;
+
+    private static readonly Dictionary<string, int> OrdenPorTipoToma = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Frontal"] = 0,
+        ["LateralDerecha"] = 1,
+        ["Trasera"] = 2,
+        ["TableroOdometro"] = 3,
+        ["Adicional1"] = 4,
+        ["Adicional2"] = 5,
+    };
+
+    private static readonly HashSet<string> TomasObligatorias = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Frontal",
+        "LateralDerecha",
+        "Trasera",
+        "TableroOdometro",
+    };
 
     private readonly IVehiculoRepository _vehiculoRepository;
     private readonly IUnitOfWork? _unitOfWork;
@@ -263,6 +283,150 @@ public class VehiculosService : IVehiculosService
         return CrearDetalleDto(nuevoVehiculo);
     }
 
+    public async Task<VehiculoDetalleDto> GuardarFotografiaAsync(
+        Guid vehiculoId,
+        GuardarFotografiaDto dto,
+        string capturadaPor)
+    {
+        var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
+        if (vehiculo is null)
+        {
+            throw new NotFoundException("Vehículo no encontrado");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.ImagenBase64))
+        {
+            throw new ValidationAppException("La fotografía es obligatoria");
+        }
+
+        var tipoTomaCanonico = ResolverTipoToma(dto.TipoToma, vehiculo.Imagenes);
+        var orden = OrdenPorTipoToma[tipoTomaCanonico];
+        var esPrincipal = string.Equals(tipoTomaCanonico, "Frontal", StringComparison.OrdinalIgnoreCase);
+
+        var imagenExistente = vehiculo.Imagenes.FirstOrDefault(
+            i => string.Equals(i.TipoToma, tipoTomaCanonico, StringComparison.OrdinalIgnoreCase));
+
+        if (imagenExistente is null && vehiculo.Imagenes.Count >= MaximoFotografiasPorUnidad)
+        {
+            throw new ValidationAppException("Máximo 6 fotografías por unidad");
+        }
+
+        var nuevaImagen = new ImagenVehiculo
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            Url = dto.ImagenBase64.Trim(),
+            EsPrincipal = esPrincipal,
+            Orden = orden,
+            TipoToma = tipoTomaCanonico,
+            FechaCaptura = DateTime.UtcNow,
+            CapturadaPor = string.IsNullOrWhiteSpace(capturadaPor)
+                ? "Encargado de Lote"
+                : capturadaPor.Trim(),
+        };
+
+        if (imagenExistente is not null)
+        {
+            vehiculo.Imagenes.Remove(imagenExistente);
+        }
+
+        vehiculo.Imagenes.Add(nuevaImagen);
+
+        if (esPrincipal)
+        {
+            vehiculo.FotoPrincipalUrl = nuevaImagen.Url;
+        }
+
+        await _vehiculoRepository.GuardarImagenAsync(vehiculo, nuevaImagen, imagenExistente);
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        return CrearDetalleDto(vehiculo);
+    }
+
+    public async Task<VehiculoDetalleDto> EliminarFotografiaAsync(
+        Guid vehiculoId,
+        Guid imagenId)
+    {
+        var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
+        if (vehiculo is null)
+        {
+            throw new NotFoundException("Vehículo no encontrado");
+        }
+
+        var imagen = vehiculo.Imagenes.FirstOrDefault(i => i.Id == imagenId);
+        if (imagen is null)
+        {
+            throw new NotFoundException("Fotografía no encontrada");
+        }
+
+        vehiculo.Imagenes.Remove(imagen);
+
+        if (imagen.EsPrincipal || string.Equals(imagen.TipoToma, "Frontal", StringComparison.OrdinalIgnoreCase))
+        {
+            var otraFrontal = vehiculo.Imagenes.FirstOrDefault(
+                i => string.Equals(i.TipoToma, "Frontal", StringComparison.OrdinalIgnoreCase));
+            vehiculo.FotoPrincipalUrl = otraFrontal?.Url;
+        }
+
+        await _vehiculoRepository.EliminarImagenAsync(vehiculo, imagen);
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        return CrearDetalleDto(vehiculo);
+    }
+
+    private static string ResolverTipoToma(string? tipoTomaSolicitado, List<ImagenVehiculo> imagenesActuales)
+    {
+        if (string.IsNullOrWhiteSpace(tipoTomaSolicitado))
+        {
+            throw new ValidationAppException("El tipo de toma fotográfica es obligatorio");
+        }
+
+        var limpio = tipoTomaSolicitado.Trim();
+
+        if (string.Equals(limpio, "Adicional", StringComparison.OrdinalIgnoreCase))
+        {
+            if (imagenesActuales.Count >= MaximoFotografiasPorUnidad)
+            {
+                throw new ValidationAppException("Máximo 6 fotografías por unidad");
+            }
+
+            var tieneAdicional1 = imagenesActuales.Any(
+                i => string.Equals(i.TipoToma, "Adicional1", StringComparison.OrdinalIgnoreCase));
+            var tieneAdicional2 = imagenesActuales.Any(
+                i => string.Equals(i.TipoToma, "Adicional2", StringComparison.OrdinalIgnoreCase));
+
+            if (!tieneAdicional1)
+            {
+                return "Adicional1";
+            }
+
+            if (!tieneAdicional2)
+            {
+                return "Adicional2";
+            }
+
+            throw new ValidationAppException("Máximo 6 fotografías por unidad");
+        }
+
+        foreach (var llave in OrdenPorTipoToma.Keys)
+        {
+            if (string.Equals(llave, limpio, StringComparison.OrdinalIgnoreCase))
+            {
+                return llave;
+            }
+        }
+
+        throw new ValidationAppException("El tipo de toma fotográfica no es válido");
+    }
+
     private static bool EsVinValido(string vin)
     {
         if (vin.Length != LongitudVin)
@@ -341,41 +505,60 @@ public class VehiculosService : IVehiculosService
         FechaRegistro = vehiculo.FechaRegistro,
     };
 
-    private static VehiculoDetalleDto CrearDetalleDto(Vehiculo vehiculo) => new()
+    private static VehiculoDetalleDto CrearDetalleDto(Vehiculo vehiculo)
     {
-        Id = vehiculo.Id,
-        Marca = vehiculo.Marca,
-        Modelo = vehiculo.Modelo,
-        Anio = vehiculo.Anio,
-        Version = vehiculo.Version,
-        Precio = vehiculo.Precio,
-        Kilometraje = vehiculo.Kilometraje,
-        Placa = vehiculo.Placa,
-        ZonaLote = vehiculo.ZonaLote,
-        CajonLote = vehiculo.CajonLote,
-        FotoPrincipalUrl = vehiculo.FotoPrincipalUrl,
-        Estado = vehiculo.Estado.ToString(),
-        Tipo = vehiculo.Tipo.ToString(),
-        FechaRegistro = vehiculo.FechaRegistro,
-        RegistradoPor = vehiculo.RegistradoPor,
-        VIN = vehiculo.VIN,
-        NumeroStock = vehiculo.NumeroStock,
-        Motor = vehiculo.Motor,
-        Potencia = vehiculo.Potencia,
-        Transmision = vehiculo.Transmision,
-        ColorExterior = vehiculo.ColorExterior,
-        ColorInterior = vehiculo.ColorInterior,
-        Equipamiento = vehiculo.Equipamiento,
-        NotasInspeccion = vehiculo.NotasInspeccion,
-        Imagenes = vehiculo.Imagenes
-            .OrderBy(imagen => imagen.EsPrincipal ? 0 : 1)
-            .ThenBy(imagen => imagen.Orden)
-            .Select(imagen => new ImagenDto
-            {
-                Url = imagen.Url,
-                EsPrincipal = imagen.EsPrincipal,
-                Orden = imagen.Orden,
-            })
-            .ToList(),
-    };
+        var tomasObligatoriasCompletadas = vehiculo.Imagenes
+            .Where(i => !string.IsNullOrWhiteSpace(i.TipoToma) && TomasObligatorias.Contains(i.TipoToma))
+            .Select(i => i.TipoToma.ToUpperInvariant())
+            .Distinct()
+            .Count();
+
+        var porcentajeEvidencia = (int)Math.Round(
+            tomasObligatoriasCompletadas * 100.0 / TotalTomasObligatorias);
+
+        return new VehiculoDetalleDto
+        {
+            Id = vehiculo.Id,
+            Marca = vehiculo.Marca,
+            Modelo = vehiculo.Modelo,
+            Anio = vehiculo.Anio,
+            Version = vehiculo.Version,
+            Precio = vehiculo.Precio,
+            Kilometraje = vehiculo.Kilometraje,
+            Placa = vehiculo.Placa,
+            ZonaLote = vehiculo.ZonaLote,
+            CajonLote = vehiculo.CajonLote,
+            FotoPrincipalUrl = vehiculo.FotoPrincipalUrl,
+            Estado = vehiculo.Estado.ToString(),
+            Tipo = vehiculo.Tipo.ToString(),
+            FechaRegistro = vehiculo.FechaRegistro,
+            RegistradoPor = vehiculo.RegistradoPor,
+            VIN = vehiculo.VIN,
+            NumeroStock = vehiculo.NumeroStock,
+            Motor = vehiculo.Motor,
+            Potencia = vehiculo.Potencia,
+            Transmision = vehiculo.Transmision,
+            ColorExterior = vehiculo.ColorExterior,
+            ColorInterior = vehiculo.ColorInterior,
+            Equipamiento = vehiculo.Equipamiento,
+            NotasInspeccion = vehiculo.NotasInspeccion,
+            TomasObligatoriasCompletadas = tomasObligatoriasCompletadas,
+            PorcentajeEvidencia = porcentajeEvidencia,
+            InspeccionCompleta = tomasObligatoriasCompletadas >= TotalTomasObligatorias,
+            Imagenes = vehiculo.Imagenes
+                .OrderBy(imagen => imagen.EsPrincipal ? 0 : 1)
+                .ThenBy(imagen => imagen.Orden)
+                .Select(imagen => new ImagenDto
+                {
+                    Id = imagen.Id,
+                    Url = imagen.Url,
+                    EsPrincipal = imagen.EsPrincipal,
+                    Orden = imagen.Orden,
+                    TipoToma = imagen.TipoToma,
+                    FechaCaptura = imagen.FechaCaptura,
+                    CapturadaPor = imagen.CapturadaPor,
+                })
+                .ToList(),
+        };
+    }
 }

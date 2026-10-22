@@ -19,14 +19,25 @@ public class ImagenVehiculoConfiguration : IEntityTypeConfiguration<ImagenVehicu
             .IsRequired();
 
         builder.Property(i => i.Url)
-            .IsRequired()
-            .HasMaxLength(500);
+            .IsRequired();
 
         builder.Property(i => i.EsPrincipal)
             .IsRequired();
 
         builder.Property(i => i.Orden)
             .IsRequired();
+
+        builder.Property(i => i.TipoToma)
+            .IsRequired()
+            .HasMaxLength(40)
+            .HasDefaultValue("Frontal");
+
+        builder.Property(i => i.FechaCaptura)
+            .IsRequired()
+            .HasColumnType("datetime2");
+
+        builder.Property(i => i.CapturadaPor)
+            .HasMaxLength(150);
 
         builder.HasIndex(i => i.VehiculoId);
 

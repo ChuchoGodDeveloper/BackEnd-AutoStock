@@ -60,4 +60,28 @@ public class VehiculosController : ControllerBase
         var creado = await _vehiculosService.RegistrarVehiculoAsync(dto, registradoPor);
         return CreatedAtAction(nameof(GetVehiculoById), new { id = creado.Id }, creado);
     }
+
+    [HttpPost("{id:guid}/fotografias")]
+    [Authorize(Roles = "Encargado de Lote y Recepción,Administrador")]
+    public async Task<ActionResult<VehiculoDetalleDto>> GuardarFotografia(
+        Guid id,
+        [FromBody] GuardarFotografiaDto dto)
+    {
+        var capturadaPor = User.FindFirst("nombre")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? "Encargado de Lote";
+
+        var actualizado = await _vehiculosService.GuardarFotografiaAsync(id, dto, capturadaPor);
+        return Ok(actualizado);
+    }
+
+    [HttpDelete("{id:guid}/fotografias/{imagenId:guid}")]
+    [Authorize(Roles = "Encargado de Lote y Recepción,Administrador")]
+    public async Task<ActionResult<VehiculoDetalleDto>> EliminarFotografia(
+        Guid id,
+        Guid imagenId)
+    {
+        var actualizado = await _vehiculosService.EliminarFotografiaAsync(id, imagenId);
+        return Ok(actualizado);
+    }
 }

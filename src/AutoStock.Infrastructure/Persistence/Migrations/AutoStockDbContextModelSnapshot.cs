@@ -27,16 +27,29 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("CapturadaPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<bool>("EsPrincipal")
                         .HasColumnType("bit");
+
+                    b.Property<DateTime>("FechaCaptura")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("Orden")
                         .HasColumnType("int");
 
+                    b.Property<string>("TipoToma")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)")
+                        .HasDefaultValue("Frontal");
+
                     b.Property<string>("Url")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("VehiculoId")
                         .HasColumnType("uniqueidentifier");
@@ -206,8 +219,7 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("FotoPrincipalUrl")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("Kilometraje")
                         .HasColumnType("int");

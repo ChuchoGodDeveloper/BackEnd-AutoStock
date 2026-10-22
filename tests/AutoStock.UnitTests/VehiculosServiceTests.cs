@@ -634,4 +634,177 @@ public class VehiculosServiceTests
 
         Assert.Contains("Vendido", ex.Message);
     }
+
+    [Fact]
+    public async Task GuardarFotografiaAsync_TomaFrontal_EstableceFotoPrincipalYAvance25PorCiento()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST25000000801");
+        vehiculo.FotoPrincipalUrl = null;
+        vehiculo.Imagenes = [];
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new GuardarFotografiaDto
+        {
+            TipoToma = "Frontal",
+            ImagenBase64 = "data:image/jpeg;base64,FOTO_FRONTAL",
+        };
+
+        var resultado = await _vehiculosService.GuardarFotografiaAsync(
+            vehiculo.Id,
+            dto,
+            "José de Jesús López Islas");
+
+        Assert.Equal("data:image/jpeg;base64,FOTO_FRONTAL", resultado.FotoPrincipalUrl);
+        Assert.Equal(1, resultado.TomasObligatoriasCompletadas);
+        Assert.Equal(25, resultado.PorcentajeEvidencia);
+        Assert.False(resultado.InspeccionCompleta);
+        var imagen = Assert.Single(resultado.Imagenes);
+        Assert.True(imagen.EsPrincipal);
+        Assert.Equal("Frontal", imagen.TipoToma);
+        Assert.Equal("José de Jesús López Islas", imagen.CapturadaPor);
+    }
+
+    [Fact]
+    public async Task GuardarFotografiaAsync_CuatroTomasObligatorias_MarcaInspeccionCompletaAl100PorCiento()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST25000000802");
+        vehiculo.Imagenes =
+        [
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Frontal", Url = "data:image/jpeg;base64,1", EsPrincipal = true, Orden = 0 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "LateralDerecha", Url = "data:image/jpeg;base64,2", Orden = 1 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Trasera", Url = "data:image/jpeg;base64,3", Orden = 2 },
+        ];
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new GuardarFotografiaDto
+        {
+            TipoToma = "TableroOdometro",
+            ImagenBase64 = "data:image/jpeg;base64,4",
+        };
+
+        var resultado = await _vehiculosService.GuardarFotografiaAsync(
+            vehiculo.Id,
+            dto,
+            "José de Jesús López Islas");
+
+        Assert.Equal(4, resultado.TomasObligatoriasCompletadas);
+        Assert.Equal(100, resultado.PorcentajeEvidencia);
+        Assert.True(resultado.InspeccionCompleta);
+        Assert.Equal(4, resultado.Imagenes.Count);
+    }
+
+    [Fact]
+    public async Task GuardarFotografiaAsync_SeptimaFotografia_LanzaValidationConMensajeMaximo6()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST25000000803");
+        vehiculo.Imagenes =
+        [
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Frontal", Url = "1", EsPrincipal = true, Orden = 0 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "LateralDerecha", Url = "2", Orden = 1 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Trasera", Url = "3", Orden = 2 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "TableroOdometro", Url = "4", Orden = 3 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Adicional1", Url = "5", Orden = 4 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Adicional2", Url = "6", Orden = 5 },
+        ];
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new GuardarFotografiaDto
+        {
+            TipoToma = "Adicional",
+            ImagenBase64 = "data:image/jpeg;base64,7",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.GuardarFotografiaAsync(vehiculo.Id, dto, "José de Jesús"));
+
+        Assert.Equal("Máximo 6 fotografías por unidad", ex.Message);
+    }
+
+    [Fact]
+    public async Task GuardarFotografiaAsync_ReemplazarTomaExistenteConSeisFotos_PermiteReemplazarSinExcederLimite()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST25000000804");
+        vehiculo.Imagenes =
+        [
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Frontal", Url = "1", EsPrincipal = true, Orden = 0 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "LateralDerecha", Url = "2", Orden = 1 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Trasera", Url = "3", Orden = 2 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "TableroOdometro", Url = "4", Orden = 3 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Adicional1", Url = "5", Orden = 4 },
+            new ImagenVehiculo { Id = Guid.NewGuid(), VehiculoId = vehiculo.Id, TipoToma = "Adicional2", Url = "6", Orden = 5 },
+        ];
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new GuardarFotografiaDto
+        {
+            TipoToma = "Frontal",
+            ImagenBase64 = "data:image/jpeg;base64,NUEVA_FRONTAL",
+        };
+
+        var resultado = await _vehiculosService.GuardarFotografiaAsync(
+            vehiculo.Id,
+            dto,
+            "José de Jesús");
+
+        Assert.Equal(6, resultado.Imagenes.Count);
+        Assert.Equal("data:image/jpeg;base64,NUEVA_FRONTAL", resultado.FotoPrincipalUrl);
+    }
+
+    [Fact]
+    public async Task EliminarFotografiaAsync_EliminaTomaFrontal_LimpiaFotoPrincipalYRegresaAPendiente()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST25000000805");
+        var imagenFrontalId = Guid.NewGuid();
+        vehiculo.FotoPrincipalUrl = "data:image/jpeg;base64,FRONTAL";
+        vehiculo.Imagenes =
+        [
+            new ImagenVehiculo
+            {
+                Id = imagenFrontalId,
+                VehiculoId = vehiculo.Id,
+                TipoToma = "Frontal",
+                Url = "data:image/jpeg;base64,FRONTAL",
+                EsPrincipal = true,
+                Orden = 0,
+            },
+        ];
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var resultado = await _vehiculosService.EliminarFotografiaAsync(vehiculo.Id, imagenFrontalId);
+
+        Assert.Null(resultado.FotoPrincipalUrl);
+        Assert.Empty(resultado.Imagenes);
+        Assert.Equal(0, resultado.TomasObligatoriasCompletadas);
+        Assert.Equal(0, resultado.PorcentajeEvidencia);
+        Assert.False(resultado.InspeccionCompleta);
+    }
+
+    [Fact]
+    public async Task EliminarFotografiaAsync_ImagenNoExiste_LanzaNotFoundException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST25000000806");
+        vehiculo.Imagenes = [];
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => _vehiculosService.EliminarFotografiaAsync(vehiculo.Id, Guid.NewGuid()));
+    }
 }

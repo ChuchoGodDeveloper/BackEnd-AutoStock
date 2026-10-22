@@ -50,5 +50,11 @@ public class VehiculoDetalleDto
 
     public string? NotasInspeccion { get; set; }
 
+    public int TomasObligatoriasCompletadas { get; set; }
+
+    public int PorcentajeEvidencia { get; set; }
+
+    public bool InspeccionCompleta { get; set; }
+
     public List<ImagenDto> Imagenes { get; set; } = [];
 }

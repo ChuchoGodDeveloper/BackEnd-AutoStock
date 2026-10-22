@@ -18,6 +18,7 @@ public class VehiculoRepository : IVehiculoRepository
     {
         return await _context.Vehiculos
             .AsNoTracking()
+            .Include(v => v.Imagenes)
             .ToListAsync();
     }
 
@@ -39,5 +40,47 @@ public class VehiculoRepository : IVehiculoRepository
     public async Task AgregarAsync(Vehiculo vehiculo)
     {
         await _context.Vehiculos.AddAsync(vehiculo);
+    }
+
+    public async Task GuardarImagenAsync(
+        Vehiculo vehiculo,
+        ImagenVehiculo nuevaImagen,
+        ImagenVehiculo? imagenReemplazada = null)
+    {
+        if (imagenReemplazada is not null)
+        {
+            var existente = await _context.ImagenesVehiculo
+                .FirstOrDefaultAsync(i => i.Id == imagenReemplazada.Id);
+            if (existente is not null)
+            {
+                _context.ImagenesVehiculo.Remove(existente);
+            }
+        }
+
+        await _context.ImagenesVehiculo.AddAsync(nuevaImagen);
+
+        var vehiculoDb = await _context.Vehiculos
+            .FirstOrDefaultAsync(v => v.Id == vehiculo.Id);
+        if (vehiculoDb is not null)
+        {
+            vehiculoDb.FotoPrincipalUrl = vehiculo.FotoPrincipalUrl;
+        }
+    }
+
+    public async Task EliminarImagenAsync(Vehiculo vehiculo, ImagenVehiculo imagen)
+    {
+        var existente = await _context.ImagenesVehiculo
+            .FirstOrDefaultAsync(i => i.Id == imagen.Id);
+        if (existente is not null)
+        {
+            _context.ImagenesVehiculo.Remove(existente);
+        }
+
+        var vehiculoDb = await _context.Vehiculos
+            .FirstOrDefaultAsync(v => v.Id == vehiculo.Id);
+        if (vehiculoDb is not null)
+        {
+            vehiculoDb.FotoPrincipalUrl = vehiculo.FotoPrincipalUrl;
+        }
     }
 }

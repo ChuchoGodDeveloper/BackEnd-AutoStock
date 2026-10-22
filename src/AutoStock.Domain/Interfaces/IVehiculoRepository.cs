@@ -11,4 +11,11 @@ public interface IVehiculoRepository
     Task<Vehiculo?> ObtenerPorVinAsync(string vin);
 
     Task AgregarAsync(Vehiculo vehiculo);
+
+    Task GuardarImagenAsync(
+        Vehiculo vehiculo,
+        ImagenVehiculo nuevaImagen,
+        ImagenVehiculo? imagenReemplazada = null);
+
+    Task EliminarImagenAsync(Vehiculo vehiculo, ImagenVehiculo imagen);
 }
