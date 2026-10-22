@@ -14,9 +14,20 @@ public interface IVehiculosService
         decimal? precioMin = null,
         decimal? precioMax = null);
 
-    Task<VehiculoDetalleDto> GetVehiculoByIdAsync(Guid id);
-
     Task<ConteosRapidosDto> GetConteosRapidosAsync();
 
-    Task<VehiculoDetalleDto> RegistrarVehiculoAsync(RegistrarVehiculoDto dto, string registradoPor);
+    Task<VehiculoDetalleDto> GetVehiculoByIdAsync(Guid id);
+
+    Task<VehiculoDetalleDto> RegistrarVehiculoAsync(
+        RegistrarVehiculoDto dto,
+        string registradoPor);
+
+    Task<VehiculoDetalleDto> GuardarFotografiaAsync(
+        Guid vehiculoId,
+        GuardarFotografiaDto dto,
+        string capturadaPor);
+
+    Task<VehiculoDetalleDto> EliminarFotografiaAsync(
+        Guid vehiculoId,
+        Guid imagenId);
 }

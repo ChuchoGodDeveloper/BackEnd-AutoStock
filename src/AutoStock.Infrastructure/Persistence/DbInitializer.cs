@@ -105,6 +105,15 @@ public static class DbInitializer
 
     private static readonly string[] ColoresExterior = ["Blanco", "Negro", "Gris", "Azul", "Rojo"];
     private static readonly string[] ColoresInterior = ["Negro", "Beige", "Gris"];
+    private static readonly string[] TiposTomaSemilla =
+    [
+        "Frontal",
+        "LateralDerecha",
+        "Trasera",
+        "TableroOdometro",
+        "Adicional1",
+        "Adicional2",
+    ];
 
     private static List<Vehiculo> CrearVehiculosDePrueba()
     {
@@ -168,6 +177,9 @@ public static class DbInitializer
                             : $"https://cdn.autostock.mx/vehiculos/{dato.Marca}-{dato.Modelo}-{dato.Anio}-v{numeroImagen + 1}.jpg".ToLowerInvariant(),
                         EsPrincipal = numeroImagen == 0,
                         Orden = numeroImagen,
+                        TipoToma = TiposTomaSemilla[numeroImagen % TiposTomaSemilla.Length],
+                        FechaCaptura = vehiculo.FechaRegistro,
+                        CapturadaPor = "Carlos Ramírez",
                     });
                 }
             }

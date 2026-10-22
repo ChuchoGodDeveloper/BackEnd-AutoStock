@@ -48,8 +48,7 @@ public class VehiculoConfiguration : IEntityTypeConfiguration<Vehiculo>
             .IsRequired()
             .HasMaxLength(20);
 
-        builder.Property(v => v.FotoPrincipalUrl)
-            .HasMaxLength(255);
+        builder.Property(v => v.FotoPrincipalUrl);
 
         builder.Property(v => v.Estado)
             .IsRequired();
