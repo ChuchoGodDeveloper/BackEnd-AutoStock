@@ -22,6 +22,40 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.HistorialEstadoVehiculo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CambiadoPor")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("EstadoAnterior")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EstadoNuevo")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FechaCambio")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("VehiculoId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FechaCambio");
+
+                    b.HasIndex("VehiculoId");
+
+                    b.ToTable("HistorialEstadosVehiculo", (string)null);
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.ImagenVehiculo", b =>
                 {
                     b.Property<Guid>("Id")
@@ -215,6 +249,16 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Property<int>("Estado")
                         .HasColumnType("int");
 
+                    b.Property<string>("EstadoActualizadoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("EstadoActualizadoPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("FechaCambioEstado")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("FechaRegistro")
                         .HasColumnType("datetime2");
 
@@ -262,6 +306,17 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<string>("ReservadoPorNombre")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("ReservadoPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ResponsableTestDrive")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<int>("Tipo")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -298,6 +353,17 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Vehiculos", (string)null);
+                });
+
+            modelBuilder.Entity("AutoStock.Domain.Entities.HistorialEstadoVehiculo", b =>
+                {
+                    b.HasOne("AutoStock.Domain.Entities.Vehiculo", "Vehiculo")
+                        .WithMany("HistorialEstados")
+                        .HasForeignKey("VehiculoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vehiculo");
                 });
 
             modelBuilder.Entity("AutoStock.Domain.Entities.ImagenVehiculo", b =>
@@ -345,6 +411,8 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("AutoStock.Domain.Entities.Vehiculo", b =>
                 {
+                    b.Navigation("HistorialEstados");
+
                     b.Navigation("Imagenes");
                 });
 #pragma warning restore 612, 618

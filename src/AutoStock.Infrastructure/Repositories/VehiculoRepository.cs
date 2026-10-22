@@ -27,6 +27,7 @@ public class VehiculoRepository : IVehiculoRepository
         return await _context.Vehiculos
             .AsNoTracking()
             .Include(v => v.Imagenes)
+            .Include(v => v.HistorialEstados)
             .FirstOrDefaultAsync(v => v.Id == id);
     }
 
@@ -81,6 +82,27 @@ public class VehiculoRepository : IVehiculoRepository
         if (vehiculoDb is not null)
         {
             vehiculoDb.FotoPrincipalUrl = vehiculo.FotoPrincipalUrl;
+        }
+    }
+
+    public async Task RegistrarCambioEstadoAsync(
+        Vehiculo vehiculo,
+        HistorialEstadoVehiculo registroHistorial)
+    {
+        await _context.HistorialEstadosVehiculo.AddAsync(registroHistorial);
+
+        var vehiculoDb = await _context.Vehiculos
+            .FirstOrDefaultAsync(v => v.Id == vehiculo.Id);
+
+        if (vehiculoDb is not null)
+        {
+            vehiculoDb.Estado = vehiculo.Estado;
+            vehiculoDb.FechaCambioEstado = vehiculo.FechaCambioEstado;
+            vehiculoDb.EstadoActualizadoPor = vehiculo.EstadoActualizadoPor;
+            vehiculoDb.EstadoActualizadoPorUsuarioId = vehiculo.EstadoActualizadoPorUsuarioId;
+            vehiculoDb.ResponsableTestDrive = vehiculo.ResponsableTestDrive;
+            vehiculoDb.ReservadoPorUsuarioId = vehiculo.ReservadoPorUsuarioId;
+            vehiculoDb.ReservadoPorNombre = vehiculo.ReservadoPorNombre;
         }
     }
 }

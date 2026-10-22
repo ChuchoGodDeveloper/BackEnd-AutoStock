@@ -16,6 +16,8 @@ public interface IVehiculosService
 
     Task<ConteosRapidosDto> GetConteosRapidosAsync();
 
+    Task<ResumenMetricasDto> GetResumenMetricasAsync();
+
     Task<VehiculoDetalleDto> GetVehiculoByIdAsync(Guid id);
 
     Task<VehiculoDetalleDto> RegistrarVehiculoAsync(
@@ -30,4 +32,11 @@ public interface IVehiculosService
     Task<VehiculoDetalleDto> EliminarFotografiaAsync(
         Guid vehiculoId,
         Guid imagenId);
+
+    Task<VehiculoDetalleDto> CambiarEstadoOperativoAsync(
+        Guid vehiculoId,
+        CambiarEstadoOperativoDto dto,
+        int? usuarioId,
+        string nombreUsuario,
+        string rolUsuario);
 }

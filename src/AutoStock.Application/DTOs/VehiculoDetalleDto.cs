@@ -32,6 +32,18 @@ public class VehiculoDetalleDto
 
     public string? RegistradoPor { get; set; }
 
+    public DateTime? FechaCambioEstado { get; set; }
+
+    public string? EstadoActualizadoPor { get; set; }
+
+    public int? EstadoActualizadoPorUsuarioId { get; set; }
+
+    public string? ResponsableTestDrive { get; set; }
+
+    public int? ReservadoPorUsuarioId { get; set; }
+
+    public string? ReservadoPorNombre { get; set; }
+
     public string VIN { get; set; } = string.Empty;
 
     public string NumeroStock { get; set; } = string.Empty;
@@ -57,4 +69,6 @@ public class VehiculoDetalleDto
     public bool InspeccionCompleta { get; set; }
 
     public List<ImagenDto> Imagenes { get; set; } = [];
+
+    public List<HistorialEstadoDto> HistorialEstados { get; set; } = [];
 }

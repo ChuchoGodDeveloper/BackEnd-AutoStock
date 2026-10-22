@@ -18,4 +18,8 @@ public interface IVehiculoRepository
         ImagenVehiculo? imagenReemplazada = null);
 
     Task EliminarImagenAsync(Vehiculo vehiculo, ImagenVehiculo imagen);
+
+    Task RegistrarCambioEstadoAsync(
+        Vehiculo vehiculo,
+        HistorialEstadoVehiculo registroHistorial);
 }
