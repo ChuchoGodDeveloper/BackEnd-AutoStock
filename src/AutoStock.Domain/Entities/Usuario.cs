@@ -10,6 +10,8 @@ public class Usuario
 
     public string NombreCompleto { get; set; } = string.Empty;
 
+    public DateOnly FechaNacimiento { get; set; }
+
     public string PasswordHash { get; set; } = string.Empty;
 
     public bool Activo { get; set; } = true;

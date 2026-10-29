@@ -33,6 +33,11 @@ public class UsuarioConfiguration : IEntityTypeConfiguration<Usuario>
             .IsRequired()
             .HasMaxLength(150);
 
+        builder.Property(u => u.FechaNacimiento)
+            .IsRequired()
+            .HasColumnType("date")
+            .HasDefaultValue(new DateOnly(2000, 1, 1));
+
         builder.Property(u => u.PasswordHash)
             .IsRequired();
 
