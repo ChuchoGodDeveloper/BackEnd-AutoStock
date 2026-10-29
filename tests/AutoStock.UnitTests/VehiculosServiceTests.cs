@@ -1236,4 +1236,235 @@ public class VehiculosServiceTests
         Assert.Contains("Mazda", ex.Message);
         Assert.Contains("3", ex.Message);
     }
+
+    [Fact]
+    public async Task ActualizarKilometrajeYNotasAsync_KmMayorOIgual_ActualizaYRegistraHistorial()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+        vehiculo.Kilometraje = 25000;
+        vehiculo.NotasInspeccion = "Nota anterior";
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new ActualizarKilometrajeDto
+        {
+            Kilometraje = 26500,
+            NotasInspeccion = "Inspección de rutina completada sin novedades.",
+        };
+
+        var resultado = await _vehiculosService.ActualizarKilometrajeYNotasAsync(
+            vehiculo.Id,
+            dto,
+            usuarioId: 10,
+            nombreUsuario: "Delia Leslie",
+            rolUsuario: "Encargado de Inventario");
+
+        Assert.Equal(26500, resultado.Kilometraje);
+        Assert.Equal("Inspección de rutina completada sin novedades.", resultado.NotasInspeccion);
+        Assert.Equal("Delia Leslie", resultado.KilometrajeActualizadoPor);
+        Assert.NotNull(resultado.FechaActualizacionKilometraje);
+        Assert.Single(resultado.HistorialKilometrajes);
+        Assert.Equal(25000, resultado.HistorialKilometrajes[0].KilometrajeAnterior);
+        Assert.Equal(26500, resultado.HistorialKilometrajes[0].KilometrajeNuevo);
+
+        _vehiculoRepositoryMock.Verify(
+            repo => repo.RegistrarActualizacionKilometrajeAsync(
+                vehiculo,
+                It.Is<HistorialKilometrajeVehiculo>(
+                    h => h.KilometrajeAnterior == 25000 &&
+                         h.KilometrajeNuevo == 26500 &&
+                         h.ActualizadoPor == "Delia Leslie")),
+            Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(default), Times.Once);
+    }
+
+    [Fact]
+    public async Task ActualizarKilometrajeYNotasAsync_UnidadVendida_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+        vehiculo.Estado = EstadoOperativo.Vendido;
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new ActualizarKilometrajeDto
+        {
+            Kilometraje = 50000,
+            NotasInspeccion = "Nueva nota",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.ActualizarKilometrajeYNotasAsync(
+                vehiculo.Id,
+                dto,
+                usuarioId: 1,
+                nombreUsuario: "Delia Leslie",
+                rolUsuario: "Gerente de Ventas"));
+
+        Assert.Contains("Las unidades con estado Vendido no se pueden editar", ex.Message);
+    }
+
+    [Fact]
+    public async Task ActualizarKilometrajeYNotasAsync_KmMenorSiendoEncargado_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+        vehiculo.Kilometraje = 40000;
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new ActualizarKilometrajeDto
+        {
+            Kilometraje = 35000,
+            NotasInspeccion = "Corrección por error",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.ActualizarKilometrajeYNotasAsync(
+                vehiculo.Id,
+                dto,
+                usuarioId: 2,
+                nombreUsuario: "Operador Patio",
+                rolUsuario: "Encargado de Inventario"));
+
+        Assert.Contains("El kilometraje no puede ser menor al registrado", ex.Message);
+    }
+
+    [Fact]
+    public async Task ActualizarKilometrajeYNotasAsync_KmMenorSiendoGerenteSinMotivo_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+        vehiculo.Kilometraje = 40000;
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new ActualizarKilometrajeDto
+        {
+            Kilometraje = 35000,
+            NotasInspeccion = "Corrección",
+            MotivoCorreccion = "abc", // Menor a 5 caracteres
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.ActualizarKilometrajeYNotasAsync(
+                vehiculo.Id,
+                dto,
+                usuarioId: 1,
+                nombreUsuario: "Gerente Demo",
+                rolUsuario: "Gerente de Ventas"));
+
+        Assert.Contains("Debes escribir el motivo de la corrección en las notas para registrar un kilometraje menor", ex.Message);
+    }
+
+    [Fact]
+    public async Task ActualizarKilometrajeYNotasAsync_KmMenorSiendoGerenteConMotivo_ActualizaExitosamente()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+        vehiculo.Kilometraje = 40000;
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new ActualizarKilometrajeDto
+        {
+            Kilometraje = 35000,
+            NotasInspeccion = "Se corrigió lectura previa",
+            MotivoCorreccion = "Error tipográfico al capturar el odómetro en la recepción",
+        };
+
+        var resultado = await _vehiculosService.ActualizarKilometrajeYNotasAsync(
+            vehiculo.Id,
+            dto,
+            usuarioId: 1,
+            nombreUsuario: "Gerente Demo",
+            rolUsuario: "Gerente de Ventas");
+
+        Assert.Equal(35000, resultado.Kilometraje);
+        Assert.Single(resultado.HistorialKilometrajes);
+        Assert.Equal("Error tipográfico al capturar el odómetro en la recepción", resultado.HistorialKilometrajes[0].MotivoCorreccion);
+        Assert.Equal(40000, resultado.HistorialKilometrajes[0].KilometrajeAnterior);
+        Assert.Equal(35000, resultado.HistorialKilometrajes[0].KilometrajeNuevo);
+    }
+
+    [Fact]
+    public async Task ActualizarKilometrajeYNotasAsync_KmInvalido_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new ActualizarKilometrajeDto
+        {
+            Kilometraje = -50,
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.ActualizarKilometrajeYNotasAsync(
+                vehiculo.Id,
+                dto,
+                usuarioId: 1,
+                nombreUsuario: "Gerente Demo",
+                rolUsuario: "Gerente de Ventas"));
+
+        Assert.Contains("El kilometraje debe ser un número entero entre 0 y 999,999 km", ex.Message);
+    }
+
+    [Fact]
+    public async Task ActualizarKilometrajeYNotasAsync_NotasExcedenLimite_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new ActualizarKilometrajeDto
+        {
+            Kilometraje = 50000,
+            NotasInspeccion = new string('A', 501),
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.ActualizarKilometrajeYNotasAsync(
+                vehiculo.Id,
+                dto,
+                usuarioId: 1,
+                nombreUsuario: "Gerente Demo",
+                rolUsuario: "Gerente de Ventas"));
+
+        Assert.Contains("Las notas de inspección no pueden exceder 500 caracteres", ex.Message);
+    }
+
+    [Fact]
+    public async Task ActualizarKilometrajeYNotasAsync_SinPermiso_LanzaForbiddenAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+
+        _permisosServiceMock
+            .Setup(p => p.ValidarPermisoAsync(99, CodigosPermiso.EditarKilometrajeNotas))
+            .ThrowsAsync(new ForbiddenAppException("No tienes permiso"));
+
+        var dto = new ActualizarKilometrajeDto
+        {
+            Kilometraje = 50000,
+        };
+
+        await Assert.ThrowsAsync<ForbiddenAppException>(
+            () => _vehiculosService.ActualizarKilometrajeYNotasAsync(
+                vehiculo.Id,
+                dto,
+                usuarioId: 99,
+                nombreUsuario: "Usuario Sin Permiso",
+                rolUsuario: "Vendedor"));
+    }
 }

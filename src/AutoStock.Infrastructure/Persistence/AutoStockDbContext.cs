@@ -24,6 +24,8 @@ public class AutoStockDbContext : DbContext
 
     public DbSet<HistorialUbicacionVehiculo> HistorialUbicacionesVehiculo => Set<HistorialUbicacionVehiculo>();
 
+    public DbSet<HistorialKilometrajeVehiculo> HistorialKilometrajesVehiculo => Set<HistorialKilometrajeVehiculo>();
+
     public DbSet<Permiso> Permisos => Set<Permiso>();
 
     public DbSet<RolPermiso> RolPermisos => Set<RolPermiso>();
