@@ -50,6 +50,12 @@ public class VehiculoDetalleDto
 
     public int? ReubicadoPorUsuarioId { get; set; }
 
+    public DateTime? FechaActualizacionKilometraje { get; set; }
+
+    public string? KilometrajeActualizadoPor { get; set; }
+
+    public int? KilometrajeActualizadoPorUsuarioId { get; set; }
+
     public string VIN { get; set; } = string.Empty;
 
     public string NumeroStock { get; set; } = string.Empty;
@@ -79,4 +85,6 @@ public class VehiculoDetalleDto
     public List<HistorialEstadoDto> HistorialEstados { get; set; } = [];
 
     public List<HistorialUbicacionDto> HistorialUbicaciones { get; set; } = [];
+
+    public List<HistorialKilometrajeDto> HistorialKilometrajes { get; set; } = [];
 }

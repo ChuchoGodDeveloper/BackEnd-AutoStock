@@ -30,6 +30,7 @@ public class VehiculoRepository : IVehiculoRepository
             .Include(v => v.Imagenes)
             .Include(v => v.HistorialEstados)
             .Include(v => v.HistorialUbicaciones)
+            .Include(v => v.HistorialKilometrajes)
             .FirstOrDefaultAsync(v => v.Id == id);
     }
 
@@ -141,4 +142,24 @@ public class VehiculoRepository : IVehiculoRepository
             vehiculoDb.ReubicadoPorUsuarioId = vehiculo.ReubicadoPorUsuarioId;
         }
     }
+
+    public async Task RegistrarActualizacionKilometrajeAsync(
+        Vehiculo vehiculo,
+        HistorialKilometrajeVehiculo registroHistorial)
+    {
+        await _context.HistorialKilometrajesVehiculo.AddAsync(registroHistorial);
+
+        var vehiculoDb = await _context.Vehiculos
+            .FirstOrDefaultAsync(v => v.Id == vehiculo.Id);
+
+        if (vehiculoDb is not null)
+        {
+            vehiculoDb.Kilometraje = vehiculo.Kilometraje;
+            vehiculoDb.NotasInspeccion = vehiculo.NotasInspeccion;
+            vehiculoDb.FechaActualizacionKilometraje = vehiculo.FechaActualizacionKilometraje;
+            vehiculoDb.KilometrajeActualizadoPor = vehiculo.KilometrajeActualizadoPor;
+            vehiculoDb.KilometrajeActualizadoPorUsuarioId = vehiculo.KilometrajeActualizadoPorUsuarioId;
+        }
+    }
+
 }

@@ -55,4 +55,11 @@ public interface IVehiculosService
         ReubicarVehiculoDto dto,
         int? usuarioId,
         string nombreUsuario);
+
+    Task<VehiculoDetalleDto> ActualizarKilometrajeYNotasAsync(
+        Guid vehiculoId,
+        ActualizarKilometrajeDto dto,
+        int? usuarioId,
+        string nombreUsuario,
+        string rolUsuario);
 }
