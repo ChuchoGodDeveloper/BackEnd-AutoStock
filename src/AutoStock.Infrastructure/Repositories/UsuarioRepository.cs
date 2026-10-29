@@ -32,8 +32,8 @@ public class UsuarioRepository : IUsuarioRepository
 
     public async Task<bool> ExisteEmpleadoIdOCorreoAsync(string empleadoId, string correo)
     {
-        var empleadoNormalizado = empleadoId.Trim().ToLower();
-        var correoNormalizado = correo.Trim().ToLower();
+        var empleadoNormalizado = empleadoId.Trim().ToLowerInvariant();
+        var correoNormalizado = correo.Trim().ToLowerInvariant();
 
         return await _context.Usuarios.AnyAsync(u =>
             u.EmpleadoId.ToLower() == empleadoNormalizado ||
@@ -42,8 +42,15 @@ public class UsuarioRepository : IUsuarioRepository
 
     public async Task<bool> ExisteEmpleadoIdAsync(string empleadoId)
     {
-        var empleadoNormalizado = empleadoId.Trim().ToLower();
+        var empleadoNormalizado = empleadoId.Trim().ToLowerInvariant();
         return await _context.Usuarios.AnyAsync(u => u.EmpleadoId.ToLower() == empleadoNormalizado);
+    }
+
+    public async Task<bool> ExisteCorreoEnOtroUsuarioAsync(int usuarioId, string correo)
+    {
+        var correoNormalizado = correo.Trim().ToLowerInvariant();
+        return await _context.Usuarios.AnyAsync(u =>
+            u.Id != usuarioId && u.Correo.ToLower() == correoNormalizado);
     }
 
     public async Task AddAsync(Usuario usuario)
