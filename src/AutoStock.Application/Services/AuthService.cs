@@ -149,7 +149,7 @@ public class AuthService : IAuthService
             EmpleadoId = usuario.EmpleadoId,
             NombreCompleto = usuario.NombreCompleto,
             Correo = usuario.Correo,
-
+            Rol = usuario.Rol.Nombre,
             FechaNacimiento = usuario.FechaNacimiento,
             Activo = usuario.Activo,
             FechaCreacion = usuario.FechaCreacion,

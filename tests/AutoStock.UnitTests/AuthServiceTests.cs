@@ -348,4 +348,23 @@ public class AuthServiceTests
         _usuarioRepositoryMock.Verify(r => r.Update(usuario), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task GetPerfilActualAsync_ConUsuarioExistente_RetornaPerfilConRolYDatosCompletos()
+    {
+        var usuario = UsuarioActivoAdministrador();
+        usuario.FechaNacimiento = new DateOnly(1995, 5, 20);
+
+        _usuarioRepositoryMock
+            .Setup(r => r.GetByIdAsync(1))
+            .ReturnsAsync(usuario);
+
+        var perfil = await _authService.GetPerfilActualAsync(1);
+
+        Assert.NotNull(perfil);
+        Assert.Equal("Carlos Ramírez", perfil.NombreCompleto);
+        Assert.Equal("Administrador", perfil.Rol);
+        Assert.Equal(new DateOnly(1995, 5, 20), perfil.FechaNacimiento);
+        Assert.Equal("admin@autostock.com", perfil.Correo);
+    }
 }
