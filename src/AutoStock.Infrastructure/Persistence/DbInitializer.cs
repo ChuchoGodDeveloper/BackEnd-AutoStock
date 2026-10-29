@@ -1,4 +1,5 @@
 using AutoStock.Application.Interfaces;
+using AutoStock.Domain.Constants;
 using AutoStock.Domain.Entities;
 using AutoStock.Domain.Enums;
 using AutoStock.Infrastructure.Persistence;
@@ -95,12 +96,98 @@ public static class DbInitializer
             await context.SaveChangesAsync();
         }
 
+        if (!await context.Permisos.AnyAsync())
+        {
+            var permisos = new List<Permiso>
+            {
+                new() { Codigo = CodigosPermiso.ConsultarCatalogo, Nombre = "Consultar catálogo y ficha técnica", Descripcion = "Permite ver el inventario completo y consultar especificaciones técnicas.", Modulo = "Catálogo", EsFijo = true },
+                new() { Codigo = CodigosPermiso.CambiarEstado, Nombre = "Cambiar estado operativo", Descripcion = "Permite cambiar el estado de la unidad (disponible, taller, lavado, test drive, apartado).", Modulo = "Inventario", EsFijo = false },
+                new() { Codigo = CodigosPermiso.RegistrarVehiculos, Nombre = "Registrar vehículos", Descripcion = "Permite dar de alta nuevas unidades en el lote.", Modulo = "Inventario", EsFijo = false },
+                new() { Codigo = CodigosPermiso.CapturarFotografias, Nombre = "Capturar fotografías", Descripcion = "Permite subir o tomar fotografías para la evidencia del vehículo.", Modulo = "Inspección", EsFijo = false },
+                new() { Codigo = CodigosPermiso.AsignarCajon, Nombre = "Asignar o reubicar cajón", Descripcion = "Permite asignar o cambiar la zona y cajón de lote del vehículo.", Modulo = "Lote", EsFijo = false },
+                new() { Codigo = CodigosPermiso.EditarKilometrajeNotas, Nombre = "Editar kilometraje y notas", Descripcion = "Permite modificar el odómetro y las notas de inspección del vehículo.", Modulo = "Inspección", EsFijo = false },
+                new() { Codigo = CodigosPermiso.GestionarOrdenesServicio, Nombre = "Gestionar órdenes de servicio", Descripcion = "Permite crear y dar seguimiento a órdenes de servicio mecánico o preparación.", Modulo = "Taller", EsFijo = false },
+                new() { Codigo = CodigosPermiso.MarcarVendido, Nombre = "Marcar unidades como vendidas", Descripcion = "Permite registrar formalmente la venta de una unidad.", Modulo = "Ventas", EsFijo = false },
+                new() { Codigo = CodigosPermiso.VerReporteVentas, Nombre = "Ver el reporte de ventas", Descripcion = "Permite consultar e imprimir el reporte comercial de ventas.", Modulo = "Ventas", EsFijo = false },
+                new() { Codigo = CodigosPermiso.VerMetricasLote, Nombre = "Ver las métricas del lote", Descripcion = "Permite visualizar los indicadores clave y estadísticas del lote.", Modulo = "Dashboard", EsFijo = false },
+            };
+
+            context.Permisos.AddRange(permisos);
+            await context.SaveChangesAsync();
+
+            var roles = await context.Roles.ToListAsync();
+            var rolPermisos = new List<RolPermiso>();
+            var ahora = DateTime.UtcNow;
+
+            foreach (var rol in roles)
+            {
+                foreach (var permiso in permisos)
+                {
+                    bool activo = EsPermisoActivoBase(rol.Nombre, permiso.Codigo);
+                    rolPermisos.Add(new RolPermiso
+                    {
+                        RolId = rol.Id,
+                        PermisoId = permiso.Id,
+                        Activo = activo,
+                        FechaModificacion = ahora,
+                        ModificadoPorNombre = "Sistema (Matriz Base)",
+                    });
+                }
+            }
+
+            context.RolPermisos.AddRange(rolPermisos);
+            await context.SaveChangesAsync();
+        }
+
         if (!await context.Vehiculos.AnyAsync())
         {
             context.Vehiculos.AddRange(CrearVehiculosDePrueba());
 
             await context.SaveChangesAsync();
         }
+    }
+
+    public static bool EsPermisoActivoBase(string nombreRol, string codigoPermiso)
+    {
+        if (codigoPermiso == CodigosPermiso.ConsultarCatalogo)
+        {
+            return true;
+        }
+
+        if (nombreRol == "Administrador")
+        {
+            return true;
+        }
+
+        return nombreRol switch
+        {
+            "Asesor de Ventas" => codigoPermiso switch
+            {
+                CodigosPermiso.CambiarEstado => true,
+                _ => false,
+            },
+            "Encargado de Lote y Recepción" => codigoPermiso switch
+            {
+                CodigosPermiso.CambiarEstado or
+                CodigosPermiso.RegistrarVehiculos or
+                CodigosPermiso.CapturarFotografias or
+                CodigosPermiso.AsignarCajon or
+                CodigosPermiso.EditarKilometrajeNotas or
+                CodigosPermiso.GestionarOrdenesServicio => true,
+                _ => false,
+            },
+            "Gerente de Ventas" => codigoPermiso switch
+            {
+                CodigosPermiso.CambiarEstado or
+                CodigosPermiso.EditarKilometrajeNotas or
+                CodigosPermiso.GestionarOrdenesServicio or
+                CodigosPermiso.MarcarVendido or
+                CodigosPermiso.VerReporteVentas or
+                CodigosPermiso.VerMetricasLote => true,
+                _ => false,
+            },
+            _ => false,
+        };
     }
 
     private static readonly string[] ColoresExterior = ["Blanco", "Negro", "Gris", "Azul", "Rojo"];

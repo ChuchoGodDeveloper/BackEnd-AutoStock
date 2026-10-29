@@ -18,4 +18,11 @@ public class RolRepository : IRolRepository
     {
         return await _context.Roles.FirstOrDefaultAsync(r => r.Id == id);
     }
+
+    public async Task<List<Rol>> GetAllAsync()
+    {
+        return await _context.Roles
+            .OrderBy(r => r.Id)
+            .ToListAsync();
+    }
 }

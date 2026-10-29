@@ -95,6 +95,44 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.ToTable("ImagenesVehiculo", (string)null);
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.Permiso", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<bool>("EsFijo")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Modulo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Codigo")
+                        .IsUnique();
+
+                    b.ToTable("Permisos", (string)null);
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.Rol", b =>
                 {
                     b.Property<int>("Id")
@@ -118,6 +156,34 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Roles", (string)null);
+                });
+
+            modelBuilder.Entity("AutoStock.Domain.Entities.RolPermiso", b =>
+                {
+                    b.Property<int>("RolId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PermisoId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("FechaModificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModificadoPorNombre")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("ModificadoPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.HasKey("RolId", "PermisoId");
+
+                    b.HasIndex("PermisoId");
+
+                    b.ToTable("RolPermisos", (string)null);
                 });
 
             modelBuilder.Entity("AutoStock.Domain.Entities.Sesion", b =>
@@ -382,6 +448,25 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Navigation("Vehiculo");
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.RolPermiso", b =>
+                {
+                    b.HasOne("AutoStock.Domain.Entities.Permiso", "Permiso")
+                        .WithMany("RolPermisos")
+                        .HasForeignKey("PermisoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("AutoStock.Domain.Entities.Rol", "Rol")
+                        .WithMany("RolPermisos")
+                        .HasForeignKey("RolId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Permiso");
+
+                    b.Navigation("Rol");
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.Sesion", b =>
                 {
                     b.HasOne("AutoStock.Domain.Entities.Usuario", "Usuario")
@@ -404,8 +489,15 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Navigation("Rol");
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.Permiso", b =>
+                {
+                    b.Navigation("RolPermisos");
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.Rol", b =>
                 {
+                    b.Navigation("RolPermisos");
+
                     b.Navigation("Usuarios");
                 });
 
