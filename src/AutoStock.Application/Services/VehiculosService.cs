@@ -16,6 +16,14 @@ public class VehiculosService : IVehiculosService
     private const int AnioMinimo = 1990;
     private const int MaximoFotografiasPorUnidad = 6;
     private const int TotalTomasObligatorias = 4;
+    private static readonly string[] ZonasDisponibles =
+    [
+        "Zona A",
+        "Zona B",
+        "Zona C",
+        "Taller",
+        "Lavado"
+    ];
 
     private static readonly Dictionary<string, int> OrdenPorTipoToma = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -341,6 +349,13 @@ public class VehiculosService : IVehiculosService
             {
                 throw new ValidationAppException("Ya existe una unidad con esa placa", duplicadoPorPlaca.Id);
             }
+        }
+
+        var ocupanteCajon = await _vehiculoRepository.ObtenerOcupanteCajonAsync(dto.ZonaLote, dto.CajonLote);
+        if (ocupanteCajon is not null)
+        {
+            var placaInfo = string.IsNullOrWhiteSpace(ocupanteCajon.Placa) ? "Sin placa" : ocupanteCajon.Placa.Trim();
+            throw new ValidationAppException($"El cajón ya está ocupado por {ocupanteCajon.Marca} {ocupanteCajon.Modelo} (Placa: {placaInfo})");
         }
 
         var numeroStock = GenerarSiguienteNumeroStock(vehiculosExistentes);
@@ -736,6 +751,128 @@ public class VehiculosService : IVehiculosService
         FechaRegistro = vehiculo.FechaRegistro,
     };
 
+    public Task<IReadOnlyList<string>> ObtenerZonasLoteAsync()
+    {
+        return Task.FromResult<IReadOnlyList<string>>(ZonasDisponibles);
+    }
+
+    public async Task<VehiculoOcupanteDto> ValidarCajonDisponibleAsync(
+        string zona,
+        string cajon,
+        Guid? ignorarVehiculoId = null)
+    {
+        if (string.IsNullOrWhiteSpace(zona) || string.IsNullOrWhiteSpace(cajon))
+        {
+            return new VehiculoOcupanteDto
+            {
+                Ocupado = false,
+            };
+        }
+
+        var ocupante = await _vehiculoRepository.ObtenerOcupanteCajonAsync(zona, cajon, ignorarVehiculoId);
+        if (ocupante is null)
+        {
+            return new VehiculoOcupanteDto
+            {
+                Ocupado = false,
+            };
+        }
+
+        var placaInfo = string.IsNullOrWhiteSpace(ocupante.Placa) ? "Sin placa" : ocupante.Placa.Trim();
+        return new VehiculoOcupanteDto
+        {
+            Ocupado = true,
+            Marca = ocupante.Marca,
+            Modelo = ocupante.Modelo,
+            Placa = placaInfo,
+            Mensaje = $"El cajón ya está ocupado por {ocupante.Marca} {ocupante.Modelo} (Placa: {placaInfo})",
+        };
+    }
+
+    public async Task<VehiculoDetalleDto> ReubicarVehiculoAsync(
+        Guid vehiculoId,
+        ReubicarVehiculoDto dto,
+        int? usuarioId,
+        string nombreUsuario)
+    {
+        if (usuarioId.HasValue && _permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId.Value, CodigosPermiso.AsignarCajon);
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Zona))
+        {
+            throw new ValidationAppException("La zona es obligatoria");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Cajon))
+        {
+            throw new ValidationAppException("El cajón es obligatorio");
+        }
+
+        var zonaNueva = dto.Zona.Trim();
+        var cajonNuevo = dto.Cajon.Trim().ToUpperInvariant();
+
+        if (cajonNuevo.Length > 6)
+        {
+            throw new ValidationAppException("El cajón no puede exceder 6 caracteres");
+        }
+
+        var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
+        if (vehiculo is null)
+        {
+            throw new KeyNotFoundException("Vehículo no encontrado");
+        }
+
+        if (string.Equals(vehiculo.ZonaLote.Trim(), zonaNueva, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(vehiculo.CajonLote.Trim(), cajonNuevo, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ValidationAppException("El vehículo ya se encuentra en la zona y cajón seleccionados");
+        }
+
+        var ocupante = await _vehiculoRepository.ObtenerOcupanteCajonAsync(zonaNueva, cajonNuevo, vehiculoId);
+        if (ocupante is not null)
+        {
+            var placaInfo = string.IsNullOrWhiteSpace(ocupante.Placa) ? "Sin placa" : ocupante.Placa.Trim();
+            throw new ValidationAppException($"El cajón ya está ocupado por {ocupante.Marca} {ocupante.Modelo} (Placa: {placaInfo})");
+        }
+
+        var zonaAnterior = vehiculo.ZonaLote;
+        var cajonAnterior = vehiculo.CajonLote;
+        var ahora = DateTime.UtcNow;
+        var reubicador = string.IsNullOrWhiteSpace(nombreUsuario) ? "Personal de Patio" : nombreUsuario.Trim();
+
+        vehiculo.ZonaLote = zonaNueva;
+        vehiculo.CajonLote = cajonNuevo;
+        vehiculo.FechaReubicacion = ahora;
+        vehiculo.ReubicadoPor = reubicador;
+        vehiculo.ReubicadoPorUsuarioId = usuarioId;
+
+        var historial = new HistorialUbicacionVehiculo
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            ZonaAnterior = zonaAnterior,
+            CajonAnterior = cajonAnterior,
+            ZonaNueva = zonaNueva,
+            CajonNuevo = cajonNuevo,
+            UsuarioId = usuarioId,
+            ReubicadoPor = reubicador,
+            FechaMovimiento = ahora,
+        };
+
+        await _vehiculoRepository.RegistrarReubicacionAsync(vehiculo, historial);
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        vehiculo.HistorialUbicaciones.Insert(0, historial);
+
+        return CrearDetalleDto(vehiculo);
+    }
+
     private static VehiculoDetalleDto CrearDetalleDto(Vehiculo vehiculo)
     {
         var tomasObligatoriasCompletadas = vehiculo.Imagenes
@@ -770,6 +907,9 @@ public class VehiculosService : IVehiculosService
             ResponsableTestDrive = vehiculo.ResponsableTestDrive,
             ReservadoPorUsuarioId = vehiculo.ReservadoPorUsuarioId,
             ReservadoPorNombre = vehiculo.ReservadoPorNombre,
+            FechaReubicacion = vehiculo.FechaReubicacion,
+            ReubicadoPor = vehiculo.ReubicadoPor,
+            ReubicadoPorUsuarioId = vehiculo.ReubicadoPorUsuarioId,
             VIN = vehiculo.VIN,
             NumeroStock = vehiculo.NumeroStock,
             Motor = vehiculo.Motor,
@@ -794,6 +934,19 @@ public class VehiculosService : IVehiculosService
                     TipoToma = imagen.TipoToma,
                     FechaCaptura = imagen.FechaCaptura,
                     CapturadaPor = imagen.CapturadaPor,
+                })
+                .ToList(),
+            HistorialUbicaciones = vehiculo.HistorialUbicaciones
+                .OrderByDescending(u => u.FechaMovimiento)
+                .Select(u => new HistorialUbicacionDto
+                {
+                    Id = u.Id,
+                    ZonaAnterior = u.ZonaAnterior,
+                    CajonAnterior = u.CajonAnterior,
+                    ZonaNueva = u.ZonaNueva,
+                    CajonNuevo = u.CajonNuevo,
+                    ReubicadoPor = u.ReubicadoPor,
+                    FechaMovimiento = u.FechaMovimiento,
                 })
                 .ToList(),
             HistorialEstados = vehiculo.HistorialEstados

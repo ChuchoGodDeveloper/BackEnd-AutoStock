@@ -42,4 +42,17 @@ public interface IVehiculosService
         int? usuarioId,
         string nombreUsuario,
         string rolUsuario);
+
+    Task<IReadOnlyList<string>> ObtenerZonasLoteAsync();
+
+    Task<VehiculoOcupanteDto> ValidarCajonDisponibleAsync(
+        string zona,
+        string cajon,
+        Guid? ignorarVehiculoId = null);
+
+    Task<VehiculoDetalleDto> ReubicarVehiculoAsync(
+        Guid vehiculoId,
+        ReubicarVehiculoDto dto,
+        int? usuarioId,
+        string nombreUsuario);
 }
