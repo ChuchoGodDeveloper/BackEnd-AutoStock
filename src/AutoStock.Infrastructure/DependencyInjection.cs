@@ -4,6 +4,7 @@ using AutoStock.Domain.Interfaces;
 using AutoStock.Infrastructure.Authentication;
 using AutoStock.Infrastructure.Persistence;
 using AutoStock.Infrastructure.Repositories;
+using AutoStock.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,8 @@ public static class DependencyInjection
         services.AddScoped<IPermisoRepository, PermisoRepository>();
         services.AddScoped<ISesionRepository, SesionRepository>();
         services.AddScoped<IVehiculoRepository, VehiculoRepository>();
+        services.AddScoped<ITokenRecuperacionRepository, TokenRecuperacionRepository>();
+        services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
