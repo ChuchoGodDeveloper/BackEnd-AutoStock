@@ -1,6 +1,7 @@
 using AutoStock.Application.DTOs;
 using AutoStock.Application.Exceptions;
 using AutoStock.Application.Interfaces;
+using AutoStock.Domain.Constants;
 using AutoStock.Domain.Entities;
 using AutoStock.Domain.Interfaces;
 
@@ -10,26 +11,28 @@ public class AuthService : IAuthService
 {
     private const int MaximoIntentosFallidos = 5;
     private const int MinutosBloqueo = 15;
-    private const int HorasVigenciaSesion = 8;
 
     private readonly IUsuarioRepository _usuarioRepository;
     private readonly ISesionRepository _sesionRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPermisosService? _permisosService;
 
     public AuthService(
         IUsuarioRepository usuarioRepository,
         ISesionRepository sesionRepository,
         IPasswordHasher passwordHasher,
         IJwtTokenGenerator jwtTokenGenerator,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IPermisosService? permisosService = null)
     {
         _usuarioRepository = usuarioRepository;
         _sesionRepository = sesionRepository;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
         _unitOfWork = unitOfWork;
+        _permisosService = permisosService;
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginRequestDto request)
@@ -82,6 +85,7 @@ public class AuthService : IAuthService
 
         usuario.IntentosFallidos = 0;
         usuario.BloqueadoHasta = null;
+        _usuarioRepository.Update(usuario);
 
         var (token, jti, expiresAt) = _jwtTokenGenerator.GenerateToken(usuario);
 
@@ -96,8 +100,9 @@ public class AuthService : IAuthService
         };
 
         await _sesionRepository.AddAsync(sesion);
-        _usuarioRepository.Update(usuario);
         await _unitOfWork.SaveChangesAsync();
+
+        var permisos = await ObtenerPermisosAsync(usuario.Rol.Id, usuario.Rol.Nombre);
 
         return new LoginResponseDto
         {
@@ -112,6 +117,7 @@ public class AuthService : IAuthService
                 Correo = usuario.Correo,
                 FechaNacimiento = usuario.FechaNacimiento,
                 Rol = usuario.Rol.Nombre,
+                Permisos = permisos,
             },
         };
     }
@@ -143,6 +149,8 @@ public class AuthService : IAuthService
             throw new AuthenticationFailedException("Usuario no encontrado");
         }
 
+        var permisos = await ObtenerPermisosAsync(usuario.Rol.Id, usuario.Rol.Nombre);
+
         return new PerfilResponseDto
         {
             Id = usuario.Id,
@@ -150,6 +158,7 @@ public class AuthService : IAuthService
             NombreCompleto = usuario.NombreCompleto,
             Correo = usuario.Correo,
             Rol = usuario.Rol.Nombre,
+            Permisos = permisos,
             FechaNacimiento = usuario.FechaNacimiento,
             Activo = usuario.Activo,
             FechaCreacion = usuario.FechaCreacion,
@@ -170,11 +179,6 @@ public class AuthService : IAuthService
             throw new ValidationAppException("La nueva contraseña debe tener al menos 8 caracteres, con letras y números");
         }
 
-        if (dto.PasswordNueva == dto.PasswordActual)
-        {
-            throw new ValidationAppException("La nueva contraseña debe ser distinta a la actual");
-        }
-
         var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
 
         if (usuario is null)
@@ -184,14 +188,25 @@ public class AuthService : IAuthService
 
         if (!_passwordHasher.Verify(dto.PasswordActual, usuario.PasswordHash))
         {
-            throw new ValidationAppException("La contraseña actual es incorrecta");
+            throw new ValidationAppException("La contraseña actual no es correcta");
         }
 
         usuario.PasswordHash = _passwordHasher.Hash(dto.PasswordNueva);
         usuario.RequiereCambioPassword = false;
         usuario.IntentosFallidos = 0;
-
         _usuarioRepository.Update(usuario);
         await _unitOfWork.SaveChangesAsync();
+    }
+
+    private async Task<List<string>> ObtenerPermisosAsync(int rolId, string nombreRol)
+    {
+        if (_permisosService is not null)
+        {
+            return await _permisosService.ObtenerCodigosPermisosActivosPorRolAsync(rolId, nombreRol);
+        }
+
+        return CodigosPermiso.TodosLosCodigos
+            .Where(c => MatrizPermisosBase.EsPermisoActivoBase(nombreRol, c))
+            .ToList();
     }
 }

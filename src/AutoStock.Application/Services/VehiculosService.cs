@@ -37,13 +37,16 @@ public class VehiculosService : IVehiculosService
 
     private readonly IVehiculoRepository _vehiculoRepository;
     private readonly IUnitOfWork? _unitOfWork;
+    private readonly IPermisosService? _permisosService;
 
     public VehiculosService(
         IVehiculoRepository vehiculoRepository,
-        IUnitOfWork? unitOfWork = null)
+        IUnitOfWork? unitOfWork = null,
+        IPermisosService? permisosService = null)
     {
         _vehiculoRepository = vehiculoRepository;
         _unitOfWork = unitOfWork;
+        _permisosService = permisosService;
     }
 
     public async Task<PaginatedResult<VehiculoDto>> GetCatalogoAsync(
@@ -162,8 +165,13 @@ public class VehiculosService : IVehiculosService
 
     public async Task<VehiculoDetalleDto> RegistrarVehiculoAsync(
         RegistrarVehiculoDto dto,
-        string registradoPor)
+        string registradoPor,
+        int? usuarioId = null)
     {
+        if (usuarioId.HasValue && _permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId.Value, CodigosPermiso.RegistrarVehiculos);
+        }
         if (string.IsNullOrWhiteSpace(dto.VIN) ||
             string.IsNullOrWhiteSpace(dto.Marca) ||
             string.IsNullOrWhiteSpace(dto.Modelo) ||
@@ -382,8 +390,13 @@ public class VehiculosService : IVehiculosService
     public async Task<VehiculoDetalleDto> GuardarFotografiaAsync(
         Guid vehiculoId,
         GuardarFotografiaDto dto,
-        string capturadaPor)
+        string capturadaPor,
+        int? usuarioId = null)
     {
+        if (usuarioId.HasValue && _permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId.Value, CodigosPermiso.CapturarFotografias);
+        }
         var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
         if (vehiculo is null)
         {
@@ -445,8 +458,13 @@ public class VehiculosService : IVehiculosService
 
     public async Task<VehiculoDetalleDto> EliminarFotografiaAsync(
         Guid vehiculoId,
-        Guid imagenId)
+        Guid imagenId,
+        int? usuarioId = null)
     {
+        if (usuarioId.HasValue && _permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId.Value, CodigosPermiso.CapturarFotografias);
+        }
         var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
         if (vehiculo is null)
         {
@@ -485,6 +503,10 @@ public class VehiculosService : IVehiculosService
         string nombreUsuario,
         string rolUsuario)
     {
+        if (usuarioId.HasValue && _permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId.Value, CodigosPermiso.CambiarEstado);
+        }
         var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
         if (vehiculo is null)
         {

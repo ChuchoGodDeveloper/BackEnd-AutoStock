@@ -12,6 +12,7 @@ public class PermisosServiceTests
 {
     private readonly Mock<IPermisoRepository> _permisoRepositoryMock = new();
     private readonly Mock<IRolRepository> _rolRepositoryMock = new();
+    private readonly Mock<IUsuarioRepository> _usuarioRepositoryMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly PermisosService _permisosService;
 
@@ -20,7 +21,8 @@ public class PermisosServiceTests
         _permisosService = new PermisosService(
             _permisoRepositoryMock.Object,
             _rolRepositoryMock.Object,
-            _unitOfWorkMock.Object);
+            _unitOfWorkMock.Object,
+            _usuarioRepositoryMock.Object);
     }
 
     private static List<Permiso> CrearPermisosPrueba() =>
@@ -182,5 +184,45 @@ public class PermisosServiceTests
         _permisoRepositoryMock.Verify(r => r.AddRolPermisosAsync(It.Is<IEnumerable<RolPermiso>>(lista =>
             lista.Count() == 40)), Times.Once);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ValidarPermisoAsync_UsuarioSinPermiso_LanzaForbiddenAppException()
+    {
+        var permisos = CrearPermisosPrueba();
+        var rolAsesor = new Rol { Id = 4, Nombre = "Asesor de Ventas" };
+        var usuario = new Usuario
+        {
+            Id = 10,
+            NombreCompleto = "Asesor Prueba",
+            RolId = 4,
+            Rol = rolAsesor,
+        };
+
+        _usuarioRepositoryMock.Setup(r => r.GetByIdAsync(10)).ReturnsAsync(usuario);
+        _permisoRepositoryMock.Setup(r => r.GetAllPermisosAsync()).ReturnsAsync(permisos);
+        _permisoRepositoryMock.Setup(r => r.GetRolPermisosByRolIdAsync(4)).ReturnsAsync([]);
+
+        var ex = await Assert.ThrowsAsync<ForbiddenAppException>(() =>
+            _permisosService.ValidarPermisoAsync(10, CodigosPermiso.RegistrarVehiculos));
+
+        Assert.Equal("No tienes permiso para realizar esta acción", ex.Message);
+    }
+
+    [Fact]
+    public async Task ValidarPermisoAsync_Administrador_PermiteCualquierAccion()
+    {
+        var rolAdmin = new Rol { Id = 1, Nombre = "Administrador" };
+        var usuario = new Usuario
+        {
+            Id = 1,
+            NombreCompleto = "Admin Prueba",
+            RolId = 1,
+            Rol = rolAdmin,
+        };
+
+        _usuarioRepositoryMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(usuario);
+
+        await _permisosService.ValidarPermisoAsync(1, CodigosPermiso.RegistrarVehiculos);
     }
 }
