@@ -12,15 +12,75 @@ public class PermisosService : IPermisosService
     private readonly IPermisoRepository _permisoRepository;
     private readonly IRolRepository _rolRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IUsuarioRepository? _usuarioRepository;
 
     public PermisosService(
         IPermisoRepository permisoRepository,
         IRolRepository rolRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IUsuarioRepository? usuarioRepository = null)
     {
         _permisoRepository = permisoRepository;
         _rolRepository = rolRepository;
         _unitOfWork = unitOfWork;
+        _usuarioRepository = usuarioRepository;
+    }
+
+    public async Task<List<string>> ObtenerCodigosPermisosActivosPorRolAsync(int rolId, string nombreRol)
+    {
+        if (nombreRol == "Administrador")
+        {
+            return CodigosPermiso.TodosLosCodigos.ToList();
+        }
+
+        var permisos = await _permisoRepository.GetAllPermisosAsync();
+        var rolPermisos = await _permisoRepository.GetRolPermisosByRolIdAsync(rolId);
+        var rolPermisosMap = rolPermisos.ToDictionary(rp => rp.Permiso.Codigo, rp => rp.Activo);
+
+        var resultado = new List<string>();
+        foreach (var permiso in permisos)
+        {
+            if (rolPermisosMap.TryGetValue(permiso.Codigo, out var activo))
+            {
+                if (activo)
+                {
+                    resultado.Add(permiso.Codigo);
+                }
+            }
+            else if (MatrizPermisosBase.EsPermisoActivoBase(nombreRol, permiso.Codigo))
+            {
+                resultado.Add(permiso.Codigo);
+            }
+        }
+
+        return resultado;
+    }
+
+    public async Task ValidarPermisoAsync(int usuarioId, string codigoPermiso)
+    {
+        if (_usuarioRepository is null)
+        {
+            return;
+        }
+
+        var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
+        if (usuario is null)
+        {
+            throw new AuthenticationFailedException("Usuario no encontrado");
+        }
+
+        if (usuario.Rol?.Nombre == "Administrador")
+        {
+            return;
+        }
+
+        var rolNombre = usuario.Rol?.Nombre ?? string.Empty;
+        var permisosActivos = await ObtenerCodigosPermisosActivosPorRolAsync(usuario.RolId, rolNombre);
+
+        if (!permisosActivos.Contains(codigoPermiso))
+        {
+            throw new ForbiddenAppException("No tienes permiso para realizar esta acción");
+        }
     }
 
     public async Task<MatrizPermisosResponseDto> GetMatrizPermisosAsync()

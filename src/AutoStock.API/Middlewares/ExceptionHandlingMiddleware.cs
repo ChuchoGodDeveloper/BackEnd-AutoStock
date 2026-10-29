@@ -40,6 +40,10 @@ public class ExceptionHandlingMiddleware
         {
             await WriteErrorResponseAsync(context, StatusCodes.Status403Forbidden, ex.Message);
         }
+        catch (ForbiddenAppException ex)
+        {
+            await WriteErrorResponseAsync(context, StatusCodes.Status403Forbidden, ex.Message);
+        }
         catch (NotFoundException ex)
         {
             await WriteErrorResponseAsync(context, StatusCodes.Status404NotFound, ex.Message);
@@ -63,10 +67,12 @@ public class ExceptionHandlingMiddleware
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = statusCode;
 
-        var payload = vehiculoExistenteId.HasValue
-            ? JsonSerializer.Serialize(new { mensaje = message, vehiculoId = vehiculoExistenteId.Value })
-            : JsonSerializer.Serialize(new { mensaje = message });
+        object respuesta = vehiculoExistenteId.HasValue
+            ? new { mensaje = message, vehiculoId = vehiculoExistenteId.Value }
+            : new { mensaje = message };
 
-        await context.Response.WriteAsync(payload);
+        var json = JsonSerializer.Serialize(respuesta);
+
+        await context.Response.WriteAsync(json);
     }
 }
