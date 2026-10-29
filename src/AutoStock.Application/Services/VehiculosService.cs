@@ -1,6 +1,7 @@
 using AutoStock.Application.DTOs;
 using AutoStock.Application.Exceptions;
 using AutoStock.Application.Interfaces;
+using AutoStock.Domain.Constants;
 using AutoStock.Domain.Entities;
 using AutoStock.Domain.Enums;
 using AutoStock.Domain.Interfaces;
@@ -176,6 +177,76 @@ public class VehiculosService : IVehiculosService
             throw new ValidationAppException("Todos los campos obligatorios deben ser completados");
         }
 
+        if (dto.Marca.Trim().Length > 50)
+        {
+            throw new ValidationAppException("La marca no puede exceder 50 caracteres");
+        }
+
+        if (dto.Modelo.Trim().Length > 50)
+        {
+            throw new ValidationAppException("El modelo no puede exceder 50 caracteres");
+        }
+
+        if (!CatalogoMarcasModelos.EsCombinacionValida(dto.Marca, dto.Modelo))
+        {
+            throw new ValidationAppException("El modelo no corresponde a la marca seleccionada");
+        }
+
+        if (dto.Version?.Trim().Length > 100)
+        {
+            throw new ValidationAppException("La versión no puede exceder 100 caracteres");
+        }
+
+        if (dto.ZonaLote.Trim().Length > 20)
+        {
+            throw new ValidationAppException("La zona del lote no puede exceder 20 caracteres");
+        }
+
+        if (dto.CajonLote.Trim().Length > 20)
+        {
+            throw new ValidationAppException("El cajón del lote no puede exceder 20 caracteres");
+        }
+
+        if (dto.Transmision.Trim().Length > 50)
+        {
+            throw new ValidationAppException("La transmisión no puede exceder 50 caracteres");
+        }
+
+        if (dto.Motor.Trim().Length > 100)
+        {
+            throw new ValidationAppException("El motor no puede exceder 100 caracteres");
+        }
+
+        if (dto.Potencia?.Trim().Length > 50)
+        {
+            throw new ValidationAppException("La potencia no puede exceder 50 caracteres");
+        }
+
+        if (dto.ColorExterior.Trim().Length > 50)
+        {
+            throw new ValidationAppException("El color exterior no puede exceder 50 caracteres");
+        }
+
+        if (dto.ColorInterior.Trim().Length > 50)
+        {
+            throw new ValidationAppException("El color interior no puede exceder 50 caracteres");
+        }
+
+        if (dto.Equipamiento?.Trim().Length > 500)
+        {
+            throw new ValidationAppException("El equipamiento no puede exceder 500 caracteres");
+        }
+
+        if (dto.NotasInspeccion?.Trim().Length > 1000)
+        {
+            throw new ValidationAppException("Las notas de inspección no pueden exceder 1000 caracteres");
+        }
+
+        if (dto.Precio > 99999999.99m)
+        {
+            throw new ValidationAppException("El precio no puede exceder 99,999,999.99");
+        }
+
         var vin = NormalizarTexto(dto.VIN);
 
         if (!EsVinValido(vin))
@@ -219,6 +290,16 @@ public class VehiculosService : IVehiculosService
             if (string.IsNullOrWhiteSpace(dto.Placa))
             {
                 throw new ValidationAppException("La placa es obligatoria para vehículos seminuevos");
+            }
+
+            if (dto.Placa.Trim().Length > 20)
+            {
+                throw new ValidationAppException("La placa no puede exceder 20 caracteres");
+            }
+
+            if (dto.Kilometraje > 1000000)
+            {
+                throw new ValidationAppException("El kilometraje no puede exceder 1,000,000 km");
             }
 
             if (dto.Kilometraje < 0)

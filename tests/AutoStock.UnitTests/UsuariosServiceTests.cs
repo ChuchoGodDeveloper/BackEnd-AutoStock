@@ -37,6 +37,7 @@ public class UsuariosServiceTests
         EmpleadoId = "EMP-00042",
         NombreCompleto = "María López",
         Correo = "maria.lopez@autostock.com",
+        FechaNacimiento = new DateOnly(1995, 4, 20),
         RolId = 2,
     };
 
@@ -68,6 +69,7 @@ public class UsuariosServiceTests
         Assert.Equal(7, resultado.Id);
         Assert.Equal("EMP-00042", resultado.EmpleadoId);
         Assert.Equal("maria.lopez@autostock.com", resultado.Correo);
+        Assert.Equal(new DateOnly(1995, 4, 20), resultado.FechaNacimiento);
         Assert.Equal("Vendedor", resultado.Rol);
         Assert.True(resultado.Activo);
         Assert.True(resultado.RequiereCambioPassword);
@@ -78,6 +80,79 @@ public class UsuariosServiceTests
         Assert.Equal(resultado.PasswordTemporal, passwordHashGuardado);
         Assert.NotNull(passwordHashGuardado);
         _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CrearUsuario_SinEmpleadoId_GeneraIdentificadorAutomaticamente()
+    {
+        var dto = DtoValido();
+        dto.EmpleadoId = null;
+
+        _usuarioRepositoryMock
+            .Setup(r => r.ExisteEmpleadoIdAsync("ML-950420-01"))
+            .ReturnsAsync(false);
+        _usuarioRepositoryMock
+            .Setup(r => r.ExisteEmpleadoIdOCorreoAsync("ML-950420-01", "maria.lopez@autostock.com"))
+            .ReturnsAsync(false);
+        _rolRepositoryMock
+            .Setup(r => r.GetByIdAsync(2))
+            .ReturnsAsync(RolVendedor());
+        _passwordHasherMock
+            .Setup(h => h.Hash(It.IsAny<string>()))
+            .Returns("hashed-pass");
+        _usuarioRepositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<Usuario>()))
+            .Callback<Usuario>(u => u.Id = 15)
+            .Returns(Task.CompletedTask);
+
+        var resultado = await _usuariosService.CrearUsuarioAsync(dto);
+
+        Assert.Equal("ML-950420-01", resultado.EmpleadoId);
+        _usuarioRepositoryMock.Verify(r => r.AddAsync(It.Is<Usuario>(u => u.EmpleadoId == "ML-950420-01")), Times.Once);
+    }
+
+    [Fact]
+    public async Task CrearUsuario_ConColisionEnConsecutivo01_IncrementaAConsecutivo02()
+    {
+        var dto = DtoValido();
+        dto.EmpleadoId = null;
+
+        _usuarioRepositoryMock
+            .Setup(r => r.ExisteEmpleadoIdAsync("ML-950420-01"))
+            .ReturnsAsync(true);
+        _usuarioRepositoryMock
+            .Setup(r => r.ExisteEmpleadoIdAsync("ML-950420-02"))
+            .ReturnsAsync(false);
+        _usuarioRepositoryMock
+            .Setup(r => r.ExisteEmpleadoIdOCorreoAsync("ML-950420-02", "maria.lopez@autostock.com"))
+            .ReturnsAsync(false);
+        _rolRepositoryMock
+            .Setup(r => r.GetByIdAsync(2))
+            .ReturnsAsync(RolVendedor());
+        _passwordHasherMock
+            .Setup(h => h.Hash(It.IsAny<string>()))
+            .Returns("hashed-pass");
+        _usuarioRepositoryMock
+            .Setup(r => r.AddAsync(It.IsAny<Usuario>()))
+            .Callback<Usuario>(u => u.Id = 16)
+            .Returns(Task.CompletedTask);
+
+        var resultado = await _usuariosService.CrearUsuarioAsync(dto);
+
+        Assert.Equal("ML-950420-02", resultado.EmpleadoId);
+    }
+
+    [Fact]
+    public async Task CrearUsuario_MenorDeEdad_LanzaValidationAppException()
+    {
+        var dto = DtoValido();
+        dto.FechaNacimiento = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-17));
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _usuariosService.CrearUsuarioAsync(dto));
+
+        Assert.Equal("El usuario debe tener al menos 18 años de edad", ex.Message);
+        _usuarioRepositoryMock.Verify(r => r.AddAsync(It.IsAny<Usuario>()), Times.Never);
     }
 
     [Fact]
