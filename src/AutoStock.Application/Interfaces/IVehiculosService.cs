@@ -22,16 +22,19 @@ public interface IVehiculosService
 
     Task<VehiculoDetalleDto> RegistrarVehiculoAsync(
         RegistrarVehiculoDto dto,
-        string registradoPor);
+        string registradoPor,
+        int? usuarioId = null);
 
     Task<VehiculoDetalleDto> GuardarFotografiaAsync(
         Guid vehiculoId,
         GuardarFotografiaDto dto,
-        string capturadaPor);
+        string capturadaPor,
+        int? usuarioId = null);
 
     Task<VehiculoDetalleDto> EliminarFotografiaAsync(
         Guid vehiculoId,
-        Guid imagenId);
+        Guid imagenId,
+        int? usuarioId = null);
 
     Task<VehiculoDetalleDto> CambiarEstadoOperativoAsync(
         Guid vehiculoId,

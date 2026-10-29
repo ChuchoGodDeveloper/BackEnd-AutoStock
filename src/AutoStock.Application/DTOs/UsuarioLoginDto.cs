@@ -13,4 +13,6 @@ public class UsuarioLoginDto
     public DateOnly FechaNacimiento { get; set; }
 
     public string Rol { get; set; } = string.Empty;
+
+    public List<string> Permisos { get; set; } = new();
 }
