@@ -14,6 +14,8 @@ public class PerfilResponseDto
 
     public string Rol { get; set; } = string.Empty;
 
+    public List<string> Permisos { get; set; } = new();
+
     public bool Activo { get; set; }
 
     public DateTime FechaCreacion { get; set; }

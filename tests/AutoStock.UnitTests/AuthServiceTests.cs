@@ -1,3 +1,4 @@
+using AutoStock.Domain.Constants;
 using AutoStock.Application.DTOs;
 using AutoStock.Application.Exceptions;
 using AutoStock.Application.Interfaces;
@@ -366,5 +367,7 @@ public class AuthServiceTests
         Assert.Equal("Administrador", perfil.Rol);
         Assert.Equal(new DateOnly(1995, 5, 20), perfil.FechaNacimiento);
         Assert.Equal("admin@autostock.com", perfil.Correo);
+        Assert.NotEmpty(perfil.Permisos);
+        Assert.Contains(CodigosPermiso.ConsultarCatalogo, perfil.Permisos);
     }
 }

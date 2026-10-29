@@ -9,7 +9,6 @@ namespace AutoStock.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class VehiculosController : ControllerBase
 {
     private readonly IVehiculosService _vehiculosService;
@@ -19,18 +18,25 @@ public class VehiculosController : ControllerBase
         _vehiculosService = vehiculosService;
     }
 
-    [HttpGet("catalogo")]
+    [HttpGet]
     public async Task<ActionResult<PaginatedResult<VehiculoDto>>> GetCatalogo(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? busqueda = null,
-        [FromQuery(Name = "estados[]")] List<EstadoOperativo>? estados = null,
+        [FromQuery] List<EstadoOperativo>? estados = null,
         [FromQuery] TipoVehiculo? tipo = null,
         [FromQuery] decimal? precioMin = null,
         [FromQuery] decimal? precioMax = null)
     {
         var resultado = await _vehiculosService.GetCatalogoAsync(
-            page, pageSize, busqueda, estados, tipo, precioMin, precioMax);
+            page,
+            pageSize,
+            busqueda,
+            estados,
+            tipo,
+            precioMin,
+            precioMax);
+
         return Ok(resultado);
     }
 
@@ -49,7 +55,7 @@ public class VehiculosController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Encargado de Lote y Recepción,Administrador")]
+    [Authorize]
     public async Task<ActionResult<VehiculoDetalleDto>> RegistrarVehiculo(
         [FromBody] RegistrarVehiculoDto dto)
     {
@@ -57,12 +63,16 @@ public class VehiculosController : ControllerBase
             ?? User.FindFirst(ClaimTypes.Name)?.Value
             ?? "Encargado de Lote";
 
-        var creado = await _vehiculosService.RegistrarVehiculoAsync(dto, registradoPor);
+        var sub = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? usuarioId = int.TryParse(sub, out var parsedId) ? parsedId : null;
+
+        var creado = await _vehiculosService.RegistrarVehiculoAsync(dto, registradoPor, usuarioId);
         return CreatedAtAction(nameof(GetVehiculoById), new { id = creado.Id }, creado);
     }
 
     [HttpPost("{id:guid}/fotografias")]
-    [Authorize(Roles = "Encargado de Lote y Recepción,Administrador")]
+    [Authorize]
     public async Task<ActionResult<VehiculoDetalleDto>> GuardarFotografia(
         Guid id,
         [FromBody] GuardarFotografiaDto dto)
@@ -71,22 +81,31 @@ public class VehiculosController : ControllerBase
             ?? User.FindFirst(ClaimTypes.Name)?.Value
             ?? "Encargado de Lote";
 
-        var actualizado = await _vehiculosService.GuardarFotografiaAsync(id, dto, capturadaPor);
+        var sub = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? usuarioId = int.TryParse(sub, out var parsedId) ? parsedId : null;
+
+        var actualizado = await _vehiculosService.GuardarFotografiaAsync(id, dto, capturadaPor, usuarioId);
         return Ok(actualizado);
     }
 
     [HttpDelete("{id:guid}/fotografias/{imagenId:guid}")]
-    [Authorize(Roles = "Encargado de Lote y Recepción,Administrador")]
+    [Authorize]
     public async Task<ActionResult<VehiculoDetalleDto>> EliminarFotografia(
         Guid id,
         Guid imagenId)
     {
-        var actualizado = await _vehiculosService.EliminarFotografiaAsync(id, imagenId);
+        var sub = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? usuarioId = int.TryParse(sub, out var parsedId) ? parsedId : null;
+
+        var actualizado = await _vehiculosService.EliminarFotografiaAsync(id, imagenId, usuarioId);
         return Ok(actualizado);
     }
 
     [HttpPatch("{id:guid}/estado")]
     [HttpPut("{id:guid}/estado")]
+    [Authorize]
     public async Task<ActionResult<VehiculoDetalleDto>> CambiarEstadoOperativo(
         Guid id,
         [FromBody] CambiarEstadoOperativoDto dto)
