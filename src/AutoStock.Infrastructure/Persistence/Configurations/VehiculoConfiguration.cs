@@ -88,6 +88,14 @@ public class VehiculoConfiguration : IEntityTypeConfiguration<Vehiculo>
 
         builder.Property(v => v.ReubicadoPorUsuarioId);
 
+        builder.Property(v => v.FechaActualizacionKilometraje)
+            .HasColumnType("datetime2");
+
+        builder.Property(v => v.KilometrajeActualizadoPor)
+            .HasMaxLength(150);
+
+        builder.Property(v => v.KilometrajeActualizadoPorUsuarioId);
+
         builder.Property(v => v.VIN)
             .IsRequired()
             .HasMaxLength(17);
@@ -128,6 +136,11 @@ public class VehiculoConfiguration : IEntityTypeConfiguration<Vehiculo>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(v => v.HistorialUbicaciones)
+            .WithOne(h => h.Vehiculo)
+            .HasForeignKey(h => h.VehiculoId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasMany(v => v.HistorialKilometrajes)
             .WithOne(h => h.Vehiculo)
             .HasForeignKey(h => h.VehiculoId)
             .OnDelete(DeleteBehavior.Cascade);

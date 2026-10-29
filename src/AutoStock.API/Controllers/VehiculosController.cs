@@ -172,4 +172,33 @@ public class VehiculosController : ControllerBase
 
         return Ok(actualizado);
     }
+
+    [HttpPut("{id:guid}/kilometraje-notas")]
+    [HttpPatch("{id:guid}/kilometraje-notas")]
+    [Authorize]
+    public async Task<ActionResult<VehiculoDetalleDto>> ActualizarKilometrajeYNotas(
+        Guid id,
+        [FromBody] ActualizarKilometrajeDto dto)
+    {
+        var sub = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        int? usuarioId = int.TryParse(sub, out var parsedId) ? parsedId : null;
+
+        var nombreUsuario = User.FindFirst("nombre")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? "Usuario";
+
+        var rolUsuario = User.FindFirst(ClaimTypes.Role)?.Value
+            ?? User.FindFirst("role")?.Value
+            ?? string.Empty;
+
+        var actualizado = await _vehiculosService.ActualizarKilometrajeYNotasAsync(
+            id,
+            dto,
+            usuarioId,
+            nombreUsuario,
+            rolUsuario);
+
+        return Ok(actualizado);
+    }
 }
