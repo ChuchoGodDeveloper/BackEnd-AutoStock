@@ -22,6 +22,10 @@ public class AutoStockDbContext : DbContext
 
     public DbSet<HistorialEstadoVehiculo> HistorialEstadosVehiculo => Set<HistorialEstadoVehiculo>();
 
+    public DbSet<Permiso> Permisos => Set<Permiso>();
+
+    public DbSet<RolPermiso> RolPermisos => Set<RolPermiso>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
