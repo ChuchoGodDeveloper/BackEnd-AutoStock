@@ -72,4 +72,31 @@ public class AuthController : ControllerBase
         await _authService.CambiarPasswordPrimerAccesoAsync(dto, usuarioId);
         return Ok(new { mensaje = "Contraseña actualizada correctamente" });
     }
+
+    [HttpPost("recuperar-password")]
+    [AllowAnonymous]
+    public async Task<ActionResult<SolicitarRecuperacionResponseDto>> SolicitarRecuperacionPassword(
+        [FromBody] SolicitarRecuperacionDto dto)
+    {
+        var origin = Request.Headers.Origin.FirstOrDefault();
+        var response = await _authService.SolicitarRecuperacionPasswordAsync(dto, origin);
+        return Ok(response);
+    }
+
+    [HttpGet("validar-token-recuperacion")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ValidarTokenRecuperacionResponseDto>> ValidarTokenRecuperacion(
+        [FromQuery] string token)
+    {
+        var response = await _authService.ValidarTokenRecuperacionAsync(token);
+        return Ok(response);
+    }
+
+    [HttpPost("restablecer-password")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RestablecerPassword([FromBody] RestablecerPasswordDto dto)
+    {
+        await _authService.RestablecerPasswordAsync(dto);
+        return Ok(new { mensaje = "Contraseña actualizada" });
+    }
 }

@@ -11,4 +11,10 @@ public interface IAuthService
     Task<PerfilResponseDto> GetPerfilActualAsync(int usuarioId);
 
     Task CambiarPasswordPrimerAccesoAsync(CambiarPasswordDto dto, int usuarioId);
+
+    Task<SolicitarRecuperacionResponseDto> SolicitarRecuperacionPasswordAsync(SolicitarRecuperacionDto dto, string? baseUrl = null);
+
+    Task<ValidarTokenRecuperacionResponseDto> ValidarTokenRecuperacionAsync(string token);
+
+    Task RestablecerPasswordAsync(RestablecerPasswordDto dto);
 }

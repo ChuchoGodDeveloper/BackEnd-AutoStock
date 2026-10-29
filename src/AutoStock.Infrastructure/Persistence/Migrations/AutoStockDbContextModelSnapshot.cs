@@ -313,6 +313,50 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.ToTable("Sesiones", (string)null);
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.TokenRecuperacionPassword", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Correo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaExpiracion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaUso")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<bool>("Usado")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Correo");
+
+                    b.HasIndex("Token");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("TokensRecuperacionPassword", (string)null);
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.Usuario", b =>
                 {
                     b.Property<int>("Id")
@@ -603,6 +647,17 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                 {
                     b.HasOne("AutoStock.Domain.Entities.Usuario", "Usuario")
                         .WithMany("Sesiones")
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("AutoStock.Domain.Entities.TokenRecuperacionPassword", b =>
+                {
+                    b.HasOne("AutoStock.Domain.Entities.Usuario", "Usuario")
+                        .WithMany()
                         .HasForeignKey("UsuarioId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
