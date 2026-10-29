@@ -22,4 +22,13 @@ public interface IVehiculoRepository
     Task RegistrarCambioEstadoAsync(
         Vehiculo vehiculo,
         HistorialEstadoVehiculo registroHistorial);
+
+    Task<Vehiculo?> ObtenerOcupanteCajonAsync(
+        string zona,
+        string cajon,
+        Guid? ignorarVehiculoId = null);
+
+    Task RegistrarReubicacionAsync(
+        Vehiculo vehiculo,
+        HistorialUbicacionVehiculo registroHistorial);
 }

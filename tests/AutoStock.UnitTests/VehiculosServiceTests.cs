@@ -1,5 +1,7 @@
 using AutoStock.Application.DTOs;
 using AutoStock.Application.Exceptions;
+using AutoStock.Application.Interfaces;
+using AutoStock.Domain.Constants;
 using AutoStock.Application.Services;
 using AutoStock.Domain.Entities;
 using AutoStock.Domain.Enums;
@@ -12,13 +14,15 @@ public class VehiculosServiceTests
 {
     private readonly Mock<IVehiculoRepository> _vehiculoRepositoryMock = new();
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
+    private readonly Mock<IPermisosService> _permisosServiceMock = new();
     private readonly VehiculosService _vehiculosService;
 
     public VehiculosServiceTests()
     {
         _vehiculosService = new VehiculosService(
             _vehiculoRepositoryMock.Object,
-            _unitOfWorkMock.Object);
+            _unitOfWorkMock.Object,
+            _permisosServiceMock.Object);
     }
 
     private static Vehiculo CrearVehiculo(int indice, EstadoOperativo estado, DateTime fechaRegistro)
@@ -1042,5 +1046,194 @@ public class VehiculosServiceTests
         Assert.Equal(nameof(EstadoOperativo.Disponible), resultado.Estado);
         Assert.Null(resultado.ReservadoPorUsuarioId);
         Assert.Null(resultado.ReservadoPorNombre);
+    }
+
+    [Fact]
+    public async Task ObtenerZonasLoteAsync_RetornaZonasCorrectas()
+    {
+        var zonas = await _vehiculosService.ObtenerZonasLoteAsync();
+
+        Assert.NotNull(zonas);
+        Assert.Contains("Zona A", zonas);
+        Assert.Contains("Zona B", zonas);
+        Assert.Contains("Zona C", zonas);
+        Assert.Contains("Taller", zonas);
+        Assert.Contains("Lavado", zonas);
+    }
+
+    [Fact]
+    public async Task ValidarCajonDisponibleAsync_CajonOcupado_RetornaOcupadoYDatosVehiculo()
+    {
+        var ocupante = CrearVehiculoParaBusqueda(0, "Honda", "Civic", "XYZ-789", "3AUTST25000000123");
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerOcupanteCajonAsync("Zona A", "14", null))
+            .ReturnsAsync(ocupante);
+
+        var resultado = await _vehiculosService.ValidarCajonDisponibleAsync("Zona A", "14");
+
+        Assert.True(resultado.Ocupado);
+        Assert.Equal("Honda", resultado.Marca);
+        Assert.Equal("Civic", resultado.Modelo);
+        Assert.NotNull(resultado.Mensaje);
+        Assert.Contains("XYZ-789", resultado.Mensaje);
+    }
+
+    [Fact]
+    public async Task ValidarCajonDisponibleAsync_CajonLibre_RetornaNoOcupado()
+    {
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerOcupanteCajonAsync("Zona B", "01", null))
+            .ReturnsAsync((Vehiculo?)null);
+
+        var resultado = await _vehiculosService.ValidarCajonDisponibleAsync("Zona B", "01");
+
+        Assert.False(resultado.Ocupado);
+        Assert.Null(resultado.Marca);
+    }
+
+    [Fact]
+    public async Task ReubicarVehiculoAsync_SinPermiso_LanzaForbiddenAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+        _permisosServiceMock
+            .Setup(s => s.ValidarPermisoAsync(2, CodigosPermiso.AsignarCajon))
+            .ThrowsAsync(new ForbiddenAppException("No tienes permiso para realizar esta acción"));
+
+        var dto = new ReubicarVehiculoDto
+        {
+            Zona = "Zona B",
+            Cajon = "12",
+        };
+
+        var ex = await Assert.ThrowsAsync<ForbiddenAppException>(
+            () => _vehiculosService.ReubicarVehiculoAsync(vehiculo.Id, dto, usuarioId: 2, nombreUsuario: "Asesor"));
+
+        Assert.Equal("No tienes permiso para realizar esta acción", ex.Message);
+    }
+
+    [Fact]
+    public async Task ReubicarVehiculoAsync_MismaUbicacion_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+        vehiculo.ZonaLote = "Zona A";
+        vehiculo.CajonLote = "05";
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new ReubicarVehiculoDto
+        {
+            Zona = "Zona A",
+            Cajon = "05",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.ReubicarVehiculoAsync(vehiculo.Id, dto, usuarioId: 1, nombreUsuario: "Encargado"));
+
+        Assert.Contains("ya se encuentra en la zona y cajón", ex.Message);
+    }
+
+    [Fact]
+    public async Task ReubicarVehiculoAsync_CajonOcupado_LanzaValidationAppExceptionConDatosVehiculo()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+        vehiculo.ZonaLote = "Zona A";
+        vehiculo.CajonLote = "05";
+
+        var ocupante = CrearVehiculoParaBusqueda(1, "Nissan", "Versa", "PQR-456", "3AUTST25000000789");
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerOcupanteCajonAsync("Zona B", "10", vehiculo.Id))
+            .ReturnsAsync(ocupante);
+
+        var dto = new ReubicarVehiculoDto
+        {
+            Zona = "Zona B",
+            Cajon = "10",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.ReubicarVehiculoAsync(vehiculo.Id, dto, usuarioId: 1, nombreUsuario: "Encargado"));
+
+        Assert.Contains("El cajón ya está ocupado", ex.Message);
+        Assert.Contains("Nissan", ex.Message);
+        Assert.Contains("Versa", ex.Message);
+        Assert.Contains("PQR-456", ex.Message);
+    }
+
+    [Fact]
+    public async Task ReubicarVehiculoAsync_Exito_ActualizaUbicacionYRegistraHistorial()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-123", "3AUTST25000000456");
+        vehiculo.ZonaLote = "Zona A";
+        vehiculo.CajonLote = "05";
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerOcupanteCajonAsync("Zona C", "22", vehiculo.Id))
+            .ReturnsAsync((Vehiculo?)null);
+
+        var dto = new ReubicarVehiculoDto
+        {
+            Zona = "Zona C",
+            Cajon = "22",
+        };
+
+        var resultado = await _vehiculosService.ReubicarVehiculoAsync(
+            vehiculo.Id,
+            dto,
+            usuarioId: 1,
+            nombreUsuario: "Juan Pérez");
+
+        Assert.Equal("Zona C", resultado.ZonaLote);
+        Assert.Equal("22", resultado.CajonLote);
+        Assert.Equal("Juan Pérez", resultado.ReubicadoPor);
+        Assert.NotNull(resultado.FechaReubicacion);
+
+        _vehiculoRepositoryMock.Verify(
+            repo => repo.RegistrarReubicacionAsync(
+                vehiculo,
+                It.Is<HistorialUbicacionVehiculo>(
+                    h => h.ZonaAnterior == "Zona A" &&
+                         h.CajonAnterior == "05" &&
+                         h.ZonaNueva == "Zona C" &&
+                         h.CajonNuevo == "22" &&
+                         h.ReubicadoPor == "Juan Pérez")),
+            Times.Once);
+
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(default), Times.Once);
+    }
+
+    [Fact]
+    public async Task RegistrarVehiculoAsync_CajonOcupado_LanzaValidationAppExceptionConDatosVehiculo()
+    {
+        var dto = CrearRegistroValido();
+        dto.ZonaLote = "Zona A";
+        dto.CajonLote = "15";
+
+        var ocupante = CrearVehiculoParaBusqueda(1, "Mazda", "3", "MZD-999", "3AUTST25000000888");
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerTodosAsync())
+            .ReturnsAsync(new List<Vehiculo>());
+
+        _vehiculoRepositoryMock
+            .Setup(repo => repo.ObtenerOcupanteCajonAsync("Zona A", "15", null))
+            .ReturnsAsync(ocupante);
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie"));
+
+        Assert.Contains("El cajón ya está ocupado", ex.Message);
+        Assert.Contains("Mazda", ex.Message);
+        Assert.Contains("3", ex.Message);
     }
 }
