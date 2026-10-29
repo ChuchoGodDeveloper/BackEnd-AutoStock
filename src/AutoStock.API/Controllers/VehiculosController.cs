@@ -19,6 +19,7 @@ public class VehiculosController : ControllerBase
     }
 
     [HttpGet]
+    [HttpGet("catalogo")]
     public async Task<ActionResult<PaginatedResult<VehiculoDto>>> GetCatalogo(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
