@@ -31,4 +31,8 @@ public interface IVehiculoRepository
     Task RegistrarReubicacionAsync(
         Vehiculo vehiculo,
         HistorialUbicacionVehiculo registroHistorial);
+
+    Task RegistrarActualizacionKilometrajeAsync(
+        Vehiculo vehiculo,
+        HistorialKilometrajeVehiculo registroHistorial);
 }

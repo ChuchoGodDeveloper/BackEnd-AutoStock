@@ -873,6 +873,98 @@ public class VehiculosService : IVehiculosService
         return CrearDetalleDto(vehiculo);
     }
 
+    public async Task<VehiculoDetalleDto> ActualizarKilometrajeYNotasAsync(
+        Guid vehiculoId,
+        ActualizarKilometrajeDto dto,
+        int? usuarioId,
+        string nombreUsuario,
+        string rolUsuario)
+    {
+        if (usuarioId.HasValue && _permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId.Value, CodigosPermiso.EditarKilometrajeNotas);
+        }
+
+        var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
+        if (vehiculo is null)
+        {
+            throw new NotFoundException("Vehículo no encontrado");
+        }
+
+        if (vehiculo.Estado == EstadoOperativo.Vendido)
+        {
+            throw new ValidationAppException("Las unidades con estado Vendido no se pueden editar");
+        }
+
+        if (dto.Kilometraje < 0 || dto.Kilometraje > 999999)
+        {
+            throw new ValidationAppException("El kilometraje debe ser un número entero entre 0 y 999,999 km");
+        }
+
+        if (dto.NotasInspeccion?.Length > 500)
+        {
+            throw new ValidationAppException("Las notas de inspección no pueden exceder 500 caracteres");
+        }
+
+        var rolLimpio = rolUsuario?.Trim() ?? string.Empty;
+        var esGerenteOAdmin =
+            string.Equals(rolLimpio, "Gerente de Ventas", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(rolLimpio, "Administrador", StringComparison.OrdinalIgnoreCase);
+
+        if (dto.Kilometraje < vehiculo.Kilometraje)
+        {
+            if (!esGerenteOAdmin)
+            {
+                throw new ValidationAppException($"El kilometraje no puede ser menor al registrado ({vehiculo.Kilometraje:N0} km)");
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.MotivoCorreccion) || dto.MotivoCorreccion.Trim().Length < 5)
+            {
+                throw new ValidationAppException("Debes escribir el motivo de la corrección en las notas para registrar un kilometraje menor");
+            }
+        }
+
+        var nombreLimpio = string.IsNullOrWhiteSpace(nombreUsuario)
+            ? "Usuario"
+            : nombreUsuario.Trim();
+        var ahora = DateTime.UtcNow;
+
+        var kilometrajeAnterior = vehiculo.Kilometraje;
+        var kilometrajeNuevo = dto.Kilometraje;
+        var notasLimpias = LimpiarOpcional(dto.NotasInspeccion);
+        var motivoLimpio = LimpiarOpcional(dto.MotivoCorreccion);
+
+        vehiculo.Kilometraje = kilometrajeNuevo;
+        vehiculo.NotasInspeccion = notasLimpias;
+        vehiculo.FechaActualizacionKilometraje = ahora;
+        vehiculo.KilometrajeActualizadoPor = nombreLimpio;
+        vehiculo.KilometrajeActualizadoPorUsuarioId = usuarioId;
+
+        var historial = new HistorialKilometrajeVehiculo
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            KilometrajeAnterior = kilometrajeAnterior,
+            KilometrajeNuevo = kilometrajeNuevo,
+            NotasInspeccion = notasLimpias,
+            MotivoCorreccion = motivoLimpio,
+            UsuarioId = usuarioId,
+            ActualizadoPor = nombreLimpio,
+            FechaActualizacion = ahora,
+        };
+
+        await _vehiculoRepository.RegistrarActualizacionKilometrajeAsync(vehiculo, historial);
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        vehiculo.HistorialKilometrajes.Insert(0, historial);
+
+        return CrearDetalleDto(vehiculo);
+    }
+
     private static VehiculoDetalleDto CrearDetalleDto(Vehiculo vehiculo)
     {
         var tomasObligatoriasCompletadas = vehiculo.Imagenes
@@ -910,6 +1002,9 @@ public class VehiculosService : IVehiculosService
             FechaReubicacion = vehiculo.FechaReubicacion,
             ReubicadoPor = vehiculo.ReubicadoPor,
             ReubicadoPorUsuarioId = vehiculo.ReubicadoPorUsuarioId,
+            FechaActualizacionKilometraje = vehiculo.FechaActualizacionKilometraje,
+            KilometrajeActualizadoPor = vehiculo.KilometrajeActualizadoPor,
+            KilometrajeActualizadoPorUsuarioId = vehiculo.KilometrajeActualizadoPorUsuarioId,
             VIN = vehiculo.VIN,
             NumeroStock = vehiculo.NumeroStock,
             Motor = vehiculo.Motor,
@@ -947,6 +1042,19 @@ public class VehiculosService : IVehiculosService
                     CajonNuevo = u.CajonNuevo,
                     ReubicadoPor = u.ReubicadoPor,
                     FechaMovimiento = u.FechaMovimiento,
+                })
+                .ToList(),
+            HistorialKilometrajes = vehiculo.HistorialKilometrajes
+                .OrderByDescending(k => k.FechaActualizacion)
+                .Select(k => new HistorialKilometrajeDto
+                {
+                    Id = k.Id,
+                    KilometrajeAnterior = k.KilometrajeAnterior,
+                    KilometrajeNuevo = k.KilometrajeNuevo,
+                    NotasInspeccion = k.NotasInspeccion,
+                    MotivoCorreccion = k.MotivoCorreccion,
+                    ActualizadoPor = k.ActualizadoPor,
+                    FechaActualizacion = k.FechaActualizacion,
                 })
                 .ToList(),
             HistorialEstados = vehiculo.HistorialEstados
