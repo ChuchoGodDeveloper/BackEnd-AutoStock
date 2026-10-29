@@ -186,6 +186,11 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("FechaCreacion")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateOnly>("FechaNacimiento")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("date")
+                        .HasDefaultValue(new DateOnly(2000, 1, 1));
+
                     b.Property<int>("IntentosFallidos")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")

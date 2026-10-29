@@ -636,6 +636,48 @@ public class VehiculosServiceTests
     }
 
     [Fact]
+    public async Task RegistrarVehiculoAsync_MarcaYModeloIncoherentes_LanzaValidationAppException()
+    {
+        var dto = CrearRegistroValido();
+        dto.Marca = "Honda";
+        dto.Modelo = "Corolla";
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie"));
+
+        Assert.Equal("El modelo no corresponde a la marca seleccionada", ex.Message);
+    }
+
+    [Fact]
+    public async Task RegistrarVehiculoAsync_CamposExcedenLongitudMaxima_LanzaValidationAppException()
+    {
+        var dto = CrearRegistroValido();
+        dto.Marca = new string('A', 51);
+
+        var exMarca = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie"));
+        Assert.Equal("La marca no puede exceder 50 caracteres", exMarca.Message);
+
+        dto = CrearRegistroValido();
+        dto.ZonaLote = new string('Z', 21);
+        var exZona = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie"));
+        Assert.Equal("La zona del lote no puede exceder 20 caracteres", exZona.Message);
+
+        dto = CrearRegistroValido();
+        dto.Precio = 100000000m;
+        var exPrecio = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie"));
+        Assert.Equal("El precio no puede exceder 99,999,999.99", exPrecio.Message);
+
+        dto = CrearRegistroValido();
+        dto.Kilometraje = 1000001;
+        var exKm = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.RegistrarVehiculoAsync(dto, "Delia Leslie"));
+        Assert.Equal("El kilometraje no puede exceder 1,000,000 km", exKm.Message);
+    }
+
+    [Fact]
     public async Task GuardarFotografiaAsync_TomaFrontal_EstableceFotoPrincipalYAvance25PorCiento()
     {
         var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "ABC-1000", "3AUTST25000000801");

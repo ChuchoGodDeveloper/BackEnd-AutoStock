@@ -10,6 +10,8 @@ public class UsuarioCreadoDto
 
     public string Correo { get; set; } = string.Empty;
 
+    public DateOnly FechaNacimiento { get; set; }
+
     public string Rol { get; set; } = string.Empty;
 
     public bool Activo { get; set; }

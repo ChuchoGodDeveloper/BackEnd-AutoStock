@@ -40,6 +40,12 @@ public class UsuarioRepository : IUsuarioRepository
             u.Correo.ToLower() == correoNormalizado);
     }
 
+    public async Task<bool> ExisteEmpleadoIdAsync(string empleadoId)
+    {
+        var empleadoNormalizado = empleadoId.Trim().ToLower();
+        return await _context.Usuarios.AnyAsync(u => u.EmpleadoId.ToLower() == empleadoNormalizado);
+    }
+
     public async Task AddAsync(Usuario usuario)
     {
         await _context.Usuarios.AddAsync(usuario);
