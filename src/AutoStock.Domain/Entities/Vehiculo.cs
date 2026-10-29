@@ -46,6 +46,12 @@ public class Vehiculo
 
     public string? ReservadoPorNombre { get; set; }
 
+    public DateTime? FechaReubicacion { get; set; }
+
+    public string? ReubicadoPor { get; set; }
+
+    public int? ReubicadoPorUsuarioId { get; set; }
+
     public string VIN { get; set; } = string.Empty;
 
     public string NumeroStock { get; set; } = string.Empty;
@@ -67,4 +73,6 @@ public class Vehiculo
     public List<ImagenVehiculo> Imagenes { get; set; } = [];
 
     public List<HistorialEstadoVehiculo> HistorialEstados { get; set; } = [];
+
+    public List<HistorialUbicacionVehiculo> HistorialUbicaciones { get; set; } = [];
 }

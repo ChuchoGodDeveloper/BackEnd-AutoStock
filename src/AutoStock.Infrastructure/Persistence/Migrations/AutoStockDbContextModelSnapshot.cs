@@ -56,6 +56,54 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.ToTable("HistorialEstadosVehiculo", (string)null);
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.HistorialUbicacionVehiculo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CajonAnterior")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("CajonNuevo")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("FechaMovimiento")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReubicadoPor")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("VehiculoId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ZonaAnterior")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ZonaNueva")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FechaMovimiento");
+
+                    b.HasIndex("VehiculoId");
+
+                    b.ToTable("HistorialUbicacionesVehiculo", (string)null);
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.ImagenVehiculo", b =>
                 {
                     b.Property<Guid>("Id")
@@ -333,6 +381,9 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("FechaRegistro")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("FechaReubicacion")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("FotoPrincipalUrl")
                         .HasColumnType("nvarchar(max)");
 
@@ -388,6 +439,13 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<string>("ReubicadoPor")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("ReubicadoPorUsuarioId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Tipo")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
@@ -430,6 +488,17 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                 {
                     b.HasOne("AutoStock.Domain.Entities.Vehiculo", "Vehiculo")
                         .WithMany("HistorialEstados")
+                        .HasForeignKey("VehiculoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vehiculo");
+                });
+
+            modelBuilder.Entity("AutoStock.Domain.Entities.HistorialUbicacionVehiculo", b =>
+                {
+                    b.HasOne("AutoStock.Domain.Entities.Vehiculo", "Vehiculo")
+                        .WithMany("HistorialUbicaciones")
                         .HasForeignKey("VehiculoId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -509,6 +578,8 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("AutoStock.Domain.Entities.Vehiculo", b =>
                 {
                     b.Navigation("HistorialEstados");
+
+                    b.Navigation("HistorialUbicaciones");
 
                     b.Navigation("Imagenes");
                 });
