@@ -12,6 +12,8 @@ public interface IUsuarioRepository
 
     Task<bool> ExisteEmpleadoIdAsync(string empleadoId);
 
+    Task<bool> ExisteCorreoEnOtroUsuarioAsync(int usuarioId, string correo);
+
     Task AddAsync(Usuario usuario);
 
     Task<IReadOnlyList<Usuario>> GetAllAsync();
