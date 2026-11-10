@@ -1,0 +1,22 @@
+# Compilación y caché de .NET / Visual Studio
+bin/
+obj/
+.vs/
+out/
+publish/
+TestResults/
+
+# Archivos de usuario, soluciones y autogenerados pesados
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.designer.cs
+
+# Secretos, bases de datos locales y logs
+appsettings.Development.json
+appsettings.Local.json
+.env
+*.db
+*.sqlite
+*.log
