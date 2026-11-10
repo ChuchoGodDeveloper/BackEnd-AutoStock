@@ -23,4 +23,15 @@ public class MetricasController : ControllerBase
         var resumen = await _vehiculosService.GetResumenMetricasAsync();
         return Ok(resumen);
     }
+
+    [HttpGet("lote-completo")]
+    public async Task<ActionResult<MetricasCompletasLoteDto>> GetMetricasCompletas()
+    {
+        var sub = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        int? usuarioId = int.TryParse(sub, out var parsedId) ? parsedId : null;
+
+        var metricas = await _vehiculosService.GetMetricasCompletasLoteAsync(usuarioId);
+        return Ok(metricas);
+    }
 }

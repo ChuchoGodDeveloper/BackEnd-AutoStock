@@ -46,4 +46,8 @@ public interface IVehiculoRepository
         Venta venta,
         HistorialEstadoVehiculo registroEstado,
         HistorialUbicacionVehiculo registroUbicacion);
+
+    Task<IReadOnlyList<HistorialEstadoVehiculo>> ObtenerUltimosMovimientosAsync(int cantidad = 5);
+
+    Task<IReadOnlyList<Venta>> ObtenerVentasMesActualAsync();
 }
