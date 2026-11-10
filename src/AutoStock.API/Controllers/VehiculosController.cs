@@ -202,4 +202,56 @@ public class VehiculosController : ControllerBase
 
         return Ok(actualizado);
     }
+
+    [HttpPost("{id:guid}/marcar-vendido")]
+    [Authorize]
+    public async Task<ActionResult<VehiculoDetalleDto>> MarcarComoVendido(
+        Guid id,
+        [FromBody] RegistrarVentaDto dto)
+    {
+        var sub = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(sub, out var usuarioId))
+        {
+            return Unauthorized();
+        }
+
+        var nombreUsuario = User.FindFirst("nombre")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? "Usuario";
+
+        var actualizado = await _vehiculosService.MarcarComoVendidoAsync(
+            id,
+            dto,
+            usuarioId,
+            nombreUsuario);
+
+        return Ok(actualizado);
+    }
+
+    [HttpPost("{id:guid}/revertir-venta")]
+    [Authorize]
+    public async Task<ActionResult<VehiculoDetalleDto>> RevertirVenta(
+        Guid id,
+        [FromBody] RevertirVentaDto dto)
+    {
+        var sub = User.FindFirst("sub")?.Value
+            ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(sub, out var usuarioId))
+        {
+            return Unauthorized();
+        }
+
+        var nombreUsuario = User.FindFirst("nombre")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? "Usuario";
+
+        var actualizado = await _vehiculosService.RevertirVentaAsync(
+            id,
+            dto,
+            usuarioId,
+            nombreUsuario);
+
+        return Ok(actualizado);
+    }
 }

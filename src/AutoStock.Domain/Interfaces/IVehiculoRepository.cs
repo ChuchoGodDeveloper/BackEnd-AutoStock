@@ -35,4 +35,15 @@ public interface IVehiculoRepository
     Task RegistrarActualizacionKilometrajeAsync(
         Vehiculo vehiculo,
         HistorialKilometrajeVehiculo registroHistorial);
+
+    Task RegistrarVentaAsync(
+        Vehiculo vehiculo,
+        Venta venta,
+        HistorialEstadoVehiculo registroHistorial);
+
+    Task RevertirVentaAsync(
+        Vehiculo vehiculo,
+        Venta venta,
+        HistorialEstadoVehiculo registroEstado,
+        HistorialUbicacionVehiculo registroUbicacion);
 }

@@ -1467,4 +1467,120 @@ public class VehiculosServiceTests
                 nombreUsuario: "Usuario Sin Permiso",
                 rolUsuario: "Vendedor"));
     }
+
+    [Fact]
+    public async Task MarcarComoVendidoAsync_UnidadDisponibleYDatosValidos_ActualizaAVendidoYLanzaVenta()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "MZ-999", "3AUTST25000000999");
+        vehiculo.Estado = EstadoOperativo.Disponible;
+        vehiculo.Precio = 450000m;
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new RegistrarVentaDto
+        {
+            FechaVenta = DateTime.UtcNow.Date,
+            AsesorId = 4,
+            PrecioFinal = 445000m,
+        };
+
+        var resultado = await _vehiculosService.MarcarComoVendidoAsync(
+            vehiculo.Id,
+            dto,
+            usuarioId: 2,
+            nombreUsuario: "Gerente Ventas");
+
+        Assert.Equal(EstadoOperativo.Vendido.ToString(), resultado.Estado);
+        Assert.NotNull(resultado.UltimaVenta);
+        Assert.Equal(445000m, resultado.UltimaVenta!.PrecioFinal);
+        Assert.False(resultado.UltimaVenta.Anulada);
+        _vehiculoRepositoryMock.Verify(r => r.RegistrarVentaAsync(It.IsAny<Vehiculo>(), It.IsAny<Venta>(), It.IsAny<HistorialEstadoVehiculo>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task MarcarComoVendidoAsync_PrecioMenorOIgualACero_LanzaValidationException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "MZ-999", "3AUTST25000000999");
+        vehiculo.Estado = EstadoOperativo.Disponible;
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new RegistrarVentaDto
+        {
+            FechaVenta = DateTime.UtcNow.Date,
+            AsesorId = 4,
+            PrecioFinal = 0m,
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.MarcarComoVendidoAsync(vehiculo.Id, dto, 2, "Gerente"));
+
+        Assert.Contains("El precio final debe ser mayor que cero", ex.Message);
+    }
+
+    [Fact]
+    public async Task MarcarComoVendidoAsync_EstadoNoPermitido_LanzaValidationException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "MZ-999", "3AUTST25000000999");
+        vehiculo.Estado = EstadoOperativo.EnTaller;
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new RegistrarVentaDto
+        {
+            FechaVenta = DateTime.UtcNow.Date,
+            AsesorId = 4,
+            PrecioFinal = 450000m,
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(
+            () => _vehiculosService.MarcarComoVendidoAsync(vehiculo.Id, dto, 2, "Gerente"));
+
+        Assert.Contains("Solo se puede marcar como vendida una unidad en estado Disponible o Reservado", ex.Message);
+    }
+
+    [Fact]
+    public async Task RevertirVentaAsync_DatosValidos_DevuelveADisponibleYAnulaVenta()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "CX-5", "MZ-999", "3AUTST25000000999");
+        vehiculo.Estado = EstadoOperativo.Vendido;
+        var venta = new Venta
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            FechaVenta = DateTime.UtcNow.Date,
+            AsesorId = 4,
+            PrecioFinal = 450000m,
+            Anulada = false,
+        };
+        vehiculo.Ventas.Add(venta);
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerOcupanteCajonAsync("Zona A", "A-01", vehiculo.Id))
+            .ReturnsAsync((Vehiculo?)null);
+
+        var dto = new RevertirVentaDto
+        {
+            Motivo = "Cliente canceló el crédito",
+            ZonaLote = "Zona A",
+            CajonLote = "A-01",
+        };
+
+        var resultado = await _vehiculosService.RevertirVentaAsync(vehiculo.Id, dto, 2, "Gerente");
+
+        Assert.Equal(EstadoOperativo.Disponible.ToString(), resultado.Estado);
+        Assert.Equal("Zona A", resultado.ZonaLote);
+        Assert.Equal("A-01", resultado.CajonLote);
+        _vehiculoRepositoryMock.Verify(r => r.RevertirVentaAsync(It.IsAny<Vehiculo>(), It.IsAny<Venta>(), It.IsAny<HistorialEstadoVehiculo>(), It.IsAny<HistorialUbicacionVehiculo>()), Times.Once);
+    }
 }

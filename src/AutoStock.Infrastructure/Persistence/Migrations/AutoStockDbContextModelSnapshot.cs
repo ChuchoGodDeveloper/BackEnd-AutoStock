@@ -580,6 +580,67 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.ToTable("Vehiculos", (string)null);
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.Venta", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Anulada")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("AnuladaPorNombre")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("AnuladaPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AsesorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AsesorNombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime?>("FechaAnulacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaRegistro")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaVenta")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MotivoAnulacion")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<decimal>("PrecioFinal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("RegistradoPorNombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("RegistradoPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("VehiculoId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Anulada");
+
+                    b.HasIndex("FechaVenta");
+
+                    b.HasIndex("VehiculoId");
+
+                    b.ToTable("Ventas", (string)null);
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.HistorialEstadoVehiculo", b =>
                 {
                     b.HasOne("AutoStock.Domain.Entities.Vehiculo", "Vehiculo")
@@ -676,6 +737,17 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Navigation("Rol");
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.Venta", b =>
+                {
+                    b.HasOne("AutoStock.Domain.Entities.Vehiculo", "Vehiculo")
+                        .WithMany("Ventas")
+                        .HasForeignKey("VehiculoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vehiculo");
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.Permiso", b =>
                 {
                     b.Navigation("RolPermisos");
@@ -702,6 +774,8 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Navigation("HistorialUbicaciones");
 
                     b.Navigation("Imagenes");
+
+                    b.Navigation("Ventas");
                 });
 #pragma warning restore 612, 618
         }
