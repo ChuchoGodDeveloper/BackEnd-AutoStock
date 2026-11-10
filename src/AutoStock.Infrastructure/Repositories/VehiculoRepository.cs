@@ -224,4 +224,27 @@ public class VehiculoRepository : IVehiculoRepository
         }
     }
 
+    public async Task<IReadOnlyList<HistorialEstadoVehiculo>> ObtenerUltimosMovimientosAsync(int cantidad = 5)
+    {
+        return await _context.HistorialEstadosVehiculo
+            .AsNoTracking()
+            .Include(h => h.Vehiculo)
+            .OrderByDescending(h => h.FechaCambio)
+            .Take(cantidad)
+            .ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<Venta>> ObtenerVentasMesActualAsync()
+    {
+        var hoy = DateTime.UtcNow;
+        var inicioMes = new DateTime(hoy.Year, hoy.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var finMes = inicioMes.AddMonths(1);
+
+        return await _context.Ventas
+            .AsNoTracking()
+            .Include(v => v.Vehiculo)
+            .Where(v => !v.Anulada && v.FechaVenta >= inicioMes && v.FechaVenta < finMes)
+            .OrderByDescending(v => v.FechaVenta)
+            .ToListAsync();
+    }
 }

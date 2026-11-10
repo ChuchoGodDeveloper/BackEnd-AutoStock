@@ -18,6 +18,8 @@ public interface IVehiculosService
 
     Task<ResumenMetricasDto> GetResumenMetricasAsync();
 
+    Task<MetricasCompletasLoteDto> GetMetricasCompletasLoteAsync(int? usuarioId);
+
     Task<VehiculoDetalleDto> GetVehiculoByIdAsync(Guid id);
 
     Task<VehiculoDetalleDto> RegistrarVehiculoAsync(

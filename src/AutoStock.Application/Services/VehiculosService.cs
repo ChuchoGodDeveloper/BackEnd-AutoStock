@@ -153,12 +153,69 @@ public class VehiculosService : IVehiculosService
     public async Task<ResumenMetricasDto> GetResumenMetricasAsync()
     {
         var vehiculos = await _vehiculoRepository.ObtenerTodosAsync();
+        var ultimos = await _vehiculoRepository.ObtenerUltimosMovimientosAsync(5);
 
         return new ResumenMetricasDto
         {
             Disponibles = vehiculos.Count(v => v.Estado == EstadoOperativo.Disponible),
             PruebaDeManejo = vehiculos.Count(v => v.Estado == EstadoOperativo.TestDrive),
             EnTaller = vehiculos.Count(v => v.Estado == EstadoOperativo.EnTaller),
+            FechaHoraServidor = DateTime.UtcNow,
+            UltimosMovimientos = ultimos.Select(u => new MovimientoRecienteDto
+            {
+                Id = u.Id,
+                VehiculoId = u.VehiculoId,
+                VehiculoTitulo = u.Vehiculo != null ? $"{u.Vehiculo.Marca} {u.Vehiculo.Modelo} ({u.Vehiculo.Anio})" : "Vehículo",
+                NumeroStock = u.Vehiculo?.NumeroStock ?? string.Empty,
+                EstadoAnterior = u.EstadoAnterior.ToString(),
+                EstadoNuevo = u.EstadoNuevo.ToString(),
+                CambiadoPor = u.CambiadoPor,
+                FechaCambio = u.FechaCambio,
+            }).ToList(),
+        };
+    }
+
+    public async Task<MetricasCompletasLoteDto> GetMetricasCompletasLoteAsync(int? usuarioId)
+    {
+        if (usuarioId.HasValue && _permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId.Value, CodigosPermiso.VerMetricasLote);
+        }
+
+        var vehiculos = await _vehiculoRepository.ObtenerTodosAsync();
+        var activas = vehiculos.Where(v => v.Estado != EstadoOperativo.Vendido).ToList();
+        var ultimos = await _vehiculoRepository.ObtenerUltimosMovimientosAsync(5);
+        var ventasMes = await _vehiculoRepository.ObtenerVentasMesActualAsync();
+
+        var hoy = DateTime.UtcNow;
+        var promedioDias = activas.Count > 0
+            ? Math.Round((decimal)activas.Average(v => Math.Max(0, (hoy - v.FechaRegistro).TotalDays)), 1)
+            : 0m;
+
+        return new MetricasCompletasLoteDto
+        {
+            TotalActivas = activas.Count,
+            Disponibles = activas.Count(v => v.Estado == EstadoOperativo.Disponible),
+            EnTestDrive = activas.Count(v => v.Estado == EstadoOperativo.TestDrive),
+            EnTaller = activas.Count(v => v.Estado == EstadoOperativo.EnTaller),
+            EnLavado = activas.Count(v => v.Estado == EstadoOperativo.EnLavado),
+            Reservadas = activas.Count(v => v.Estado == EstadoOperativo.Reservado),
+            Nuevas = activas.Count(v => v.Tipo == TipoVehiculo.Nuevo),
+            Seminuevas = activas.Count(v => v.Tipo == TipoVehiculo.Seminuevo),
+            VentasMesActual = ventasMes.Count,
+            PromedioDiasEnLote = promedioDias,
+            FechaHoraServidor = hoy,
+            UltimosMovimientos = ultimos.Select(u => new MovimientoRecienteDto
+            {
+                Id = u.Id,
+                VehiculoId = u.VehiculoId,
+                VehiculoTitulo = u.Vehiculo != null ? $"{u.Vehiculo.Marca} {u.Vehiculo.Modelo} ({u.Vehiculo.Anio})" : "Vehículo",
+                NumeroStock = u.Vehiculo?.NumeroStock ?? string.Empty,
+                EstadoAnterior = u.EstadoAnterior.ToString(),
+                EstadoNuevo = u.EstadoNuevo.ToString(),
+                CambiadoPor = u.CambiadoPor,
+                FechaCambio = u.FechaCambio,
+            }).ToList(),
         };
     }
 
