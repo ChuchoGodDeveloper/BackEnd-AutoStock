@@ -32,6 +32,8 @@ public class AutoStockDbContext : DbContext
 
     public DbSet<TokenRecuperacionPassword> TokensRecuperacionPassword => Set<TokenRecuperacionPassword>();
 
+    public DbSet<Venta> Ventas => Set<Venta>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

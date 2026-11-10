@@ -83,4 +83,6 @@ public class Vehiculo
     public List<HistorialUbicacionVehiculo> HistorialUbicaciones { get; set; } = [];
 
     public List<HistorialKilometrajeVehiculo> HistorialKilometrajes { get; set; } = [];
+
+    public List<Venta> Ventas { get; set; } = [];
 }

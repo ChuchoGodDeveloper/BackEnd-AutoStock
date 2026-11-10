@@ -62,4 +62,16 @@ public interface IVehiculosService
         int? usuarioId,
         string nombreUsuario,
         string rolUsuario);
+
+    Task<VehiculoDetalleDto> MarcarComoVendidoAsync(
+        Guid vehiculoId,
+        RegistrarVentaDto dto,
+        int usuarioId,
+        string nombreUsuario);
+
+    Task<VehiculoDetalleDto> RevertirVentaAsync(
+        Guid vehiculoId,
+        RevertirVentaDto dto,
+        int usuarioId,
+        string nombreUsuario);
 }
