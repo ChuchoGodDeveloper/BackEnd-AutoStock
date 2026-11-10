@@ -87,4 +87,6 @@ public class VehiculoDetalleDto
     public List<HistorialUbicacionDto> HistorialUbicaciones { get; set; } = [];
 
     public List<HistorialKilometrajeDto> HistorialKilometrajes { get; set; } = [];
+
+    public VentaDto? UltimaVenta { get; set; }
 }

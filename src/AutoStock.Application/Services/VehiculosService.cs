@@ -46,15 +46,18 @@ public class VehiculosService : IVehiculosService
     private readonly IVehiculoRepository _vehiculoRepository;
     private readonly IUnitOfWork? _unitOfWork;
     private readonly IPermisosService? _permisosService;
+    private readonly IUsuarioRepository? _usuarioRepository;
 
     public VehiculosService(
         IVehiculoRepository vehiculoRepository,
         IUnitOfWork? unitOfWork = null,
-        IPermisosService? permisosService = null)
+        IPermisosService? permisosService = null,
+        IUsuarioRepository? usuarioRepository = null)
     {
         _vehiculoRepository = vehiculoRepository;
         _unitOfWork = unitOfWork;
         _permisosService = permisosService;
+        _usuarioRepository = usuarioRepository;
     }
 
     public async Task<PaginatedResult<VehiculoDto>> GetCatalogoAsync(
@@ -965,6 +968,208 @@ public class VehiculosService : IVehiculosService
         return CrearDetalleDto(vehiculo);
     }
 
+    public async Task<VehiculoDetalleDto> MarcarComoVendidoAsync(
+        Guid vehiculoId,
+        RegistrarVentaDto dto,
+        int usuarioId,
+        string nombreUsuario)
+    {
+        if (_permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId, CodigosPermiso.MarcarVendido);
+        }
+
+        var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
+        if (vehiculo is null)
+        {
+            throw new NotFoundException("Vehículo no encontrado");
+        }
+
+        if (vehiculo.Estado != EstadoOperativo.Disponible && vehiculo.Estado != EstadoOperativo.Reservado)
+        {
+            throw new ValidationAppException("Solo se puede marcar como vendida una unidad en estado Disponible o Reservado");
+        }
+
+        var hoy = DateTime.UtcNow.Date;
+        if (dto.FechaVenta.Date > hoy)
+        {
+            throw new ValidationAppException("La fecha de venta no puede ser posterior a hoy");
+        }
+
+        if (dto.FechaVenta.Date < vehiculo.FechaRegistro.Date)
+        {
+            throw new ValidationAppException("La fecha de venta no puede ser anterior a la fecha de ingreso de la unidad");
+        }
+
+        if (dto.PrecioFinal <= 0)
+        {
+            throw new ValidationAppException("El precio final debe ser mayor que cero");
+        }
+
+        string asesorNombre = "Asesor de Ventas";
+        if (_usuarioRepository is not null)
+        {
+            var asesor = await _usuarioRepository.GetByIdAsync(dto.AsesorId);
+            if (asesor is null || !asesor.Activo)
+            {
+                throw new ValidationAppException("El asesor seleccionado no es válido o está inactivo");
+            }
+            asesorNombre = asesor.NombreCompleto;
+        }
+
+        var ahora = DateTime.UtcNow;
+        var venta = new Venta
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            FechaVenta = dto.FechaVenta,
+            AsesorId = dto.AsesorId,
+            AsesorNombre = asesorNombre,
+            PrecioFinal = dto.PrecioFinal,
+            FechaRegistro = ahora,
+            RegistradoPorUsuarioId = usuarioId,
+            RegistradoPorNombre = nombreUsuario,
+            Anulada = false,
+        };
+
+        var estadoAnterior = vehiculo.Estado;
+        vehiculo.Estado = EstadoOperativo.Vendido;
+        vehiculo.FechaCambioEstado = ahora;
+        vehiculo.EstadoActualizadoPor = nombreUsuario;
+        vehiculo.EstadoActualizadoPorUsuarioId = usuarioId;
+        vehiculo.ZonaLote = "Vendido";
+        vehiculo.CajonLote = "LIBRE";
+
+        var historial = new HistorialEstadoVehiculo
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            EstadoAnterior = estadoAnterior,
+            EstadoNuevo = EstadoOperativo.Vendido,
+            UsuarioId = usuarioId,
+            CambiadoPor = nombreUsuario,
+            FechaCambio = ahora,
+        };
+
+        await _vehiculoRepository.RegistrarVentaAsync(vehiculo, venta, historial);
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        vehiculo.HistorialEstados.Insert(0, historial);
+        vehiculo.Ventas.Insert(0, venta);
+
+        return CrearDetalleDto(vehiculo);
+    }
+
+    public async Task<VehiculoDetalleDto> RevertirVentaAsync(
+        Guid vehiculoId,
+        RevertirVentaDto dto,
+        int usuarioId,
+        string nombreUsuario)
+    {
+        if (_permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId, CodigosPermiso.MarcarVendido);
+        }
+
+        var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
+        if (vehiculo is null)
+        {
+            throw new NotFoundException("Vehículo no encontrado");
+        }
+
+        if (vehiculo.Estado != EstadoOperativo.Vendido)
+        {
+            throw new ValidationAppException("Solo se pueden revertir unidades que tengan estado Vendido");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Motivo) || dto.Motivo.Trim().Length < 5)
+        {
+            throw new ValidationAppException("Debes capturar el motivo de la anulación (mínimo 5 caracteres)");
+        }
+
+        var zonaNueva = dto.ZonaLote?.Trim() ?? string.Empty;
+        var cajonNuevo = dto.CajonLote?.Trim().ToUpperInvariant() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(zonaNueva) || !ZonasDisponibles.Contains(zonaNueva, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ValidationAppException("Debes seleccionar una zona válida del lote");
+        }
+
+        if (string.IsNullOrWhiteSpace(cajonNuevo) || cajonNuevo.Length > 6)
+        {
+            throw new ValidationAppException("El cajón debe tener entre 1 y 6 caracteres");
+        }
+
+        var ocupante = await _vehiculoRepository.ObtenerOcupanteCajonAsync(zonaNueva, cajonNuevo, vehiculo.Id);
+        if (ocupante is not null)
+        {
+            throw new ValidationAppException($"El cajón {cajonNuevo} en {zonaNueva} ya está ocupado por otra unidad");
+        }
+
+        var ultimaVenta = vehiculo.Ventas.OrderByDescending(v => v.FechaRegistro).FirstOrDefault(v => !v.Anulada);
+        if (ultimaVenta is null)
+        {
+            throw new ValidationAppException("No se encontró un registro de venta activo para anular");
+        }
+
+        var ahora = DateTime.UtcNow;
+        ultimaVenta.Anulada = true;
+        ultimaVenta.MotivoAnulacion = dto.Motivo.Trim();
+        ultimaVenta.FechaAnulacion = ahora;
+        ultimaVenta.AnuladaPorUsuarioId = usuarioId;
+        ultimaVenta.AnuladaPorNombre = nombreUsuario;
+
+        vehiculo.Estado = EstadoOperativo.Disponible;
+        vehiculo.ZonaLote = zonaNueva;
+        vehiculo.CajonLote = cajonNuevo;
+        vehiculo.FechaCambioEstado = ahora;
+        vehiculo.EstadoActualizadoPor = nombreUsuario;
+        vehiculo.EstadoActualizadoPorUsuarioId = usuarioId;
+        vehiculo.FechaReubicacion = ahora;
+        vehiculo.ReubicadoPor = nombreUsuario;
+        vehiculo.ReubicadoPorUsuarioId = usuarioId;
+
+        var historialEstado = new HistorialEstadoVehiculo
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            EstadoAnterior = EstadoOperativo.Vendido,
+            EstadoNuevo = EstadoOperativo.Disponible,
+            UsuarioId = usuarioId,
+            CambiadoPor = $"{nombreUsuario} (Venta revertida: {dto.Motivo.Trim()})",
+            FechaCambio = ahora,
+        };
+
+        var historialUbicacion = new HistorialUbicacionVehiculo
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            ZonaAnterior = "Vendido",
+            CajonAnterior = "LIBRE",
+            ZonaNueva = zonaNueva,
+            CajonNuevo = cajonNuevo,
+            ReubicadoPor = nombreUsuario,
+            UsuarioId = usuarioId,
+            FechaMovimiento = ahora,
+        };
+
+        await _vehiculoRepository.RevertirVentaAsync(vehiculo, ultimaVenta, historialEstado, historialUbicacion);
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        vehiculo.HistorialEstados.Insert(0, historialEstado);
+        vehiculo.HistorialUbicaciones.Insert(0, historialUbicacion);
+
+        return CrearDetalleDto(vehiculo);
+    }
+
     private static VehiculoDetalleDto CrearDetalleDto(Vehiculo vehiculo)
     {
         var tomasObligatoriasCompletadas = vehiculo.Imagenes
@@ -1069,6 +1274,22 @@ public class VehiculosService : IVehiculosService
                     FechaCambio = h.FechaCambio,
                 })
                 .ToList(),
+            UltimaVenta = vehiculo.Ventas
+                .OrderByDescending(v => v.FechaRegistro)
+                .Select(v => new VentaDto
+                {
+                    Id = v.Id,
+                    VehiculoId = v.VehiculoId,
+                    FechaVenta = v.FechaVenta,
+                    AsesorId = v.AsesorId,
+                    AsesorNombre = v.AsesorNombre,
+                    PrecioFinal = v.PrecioFinal,
+                    FechaRegistro = v.FechaRegistro,
+                    RegistradoPorNombre = v.RegistradoPorNombre,
+                    Anulada = v.Anulada,
+                    MotivoAnulacion = v.MotivoAnulacion,
+                })
+                .FirstOrDefault(),
         };
     }
 }

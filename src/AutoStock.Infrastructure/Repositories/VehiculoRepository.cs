@@ -31,6 +31,7 @@ public class VehiculoRepository : IVehiculoRepository
             .Include(v => v.HistorialEstados)
             .Include(v => v.HistorialUbicaciones)
             .Include(v => v.HistorialKilometrajes)
+            .Include(v => v.Ventas)
             .FirstOrDefaultAsync(v => v.Id == id);
     }
 
@@ -159,6 +160,67 @@ public class VehiculoRepository : IVehiculoRepository
             vehiculoDb.FechaActualizacionKilometraje = vehiculo.FechaActualizacionKilometraje;
             vehiculoDb.KilometrajeActualizadoPor = vehiculo.KilometrajeActualizadoPor;
             vehiculoDb.KilometrajeActualizadoPorUsuarioId = vehiculo.KilometrajeActualizadoPorUsuarioId;
+        }
+    }
+
+    public async Task RegistrarVentaAsync(
+        Vehiculo vehiculo,
+        Venta venta,
+        HistorialEstadoVehiculo registroHistorial)
+    {
+        await _context.Ventas.AddAsync(venta);
+        await _context.HistorialEstadosVehiculo.AddAsync(registroHistorial);
+
+        var vehiculoDb = await _context.Vehiculos
+            .FirstOrDefaultAsync(v => v.Id == vehiculo.Id);
+
+        if (vehiculoDb is not null)
+        {
+            vehiculoDb.Estado = vehiculo.Estado;
+            vehiculoDb.ZonaLote = vehiculo.ZonaLote;
+            vehiculoDb.CajonLote = vehiculo.CajonLote;
+            vehiculoDb.FechaCambioEstado = vehiculo.FechaCambioEstado;
+            vehiculoDb.EstadoActualizadoPor = vehiculo.EstadoActualizadoPor;
+            vehiculoDb.EstadoActualizadoPorUsuarioId = vehiculo.EstadoActualizadoPorUsuarioId;
+            vehiculoDb.ReservadoPorUsuarioId = null;
+            vehiculoDb.ReservadoPorNombre = null;
+            vehiculoDb.ResponsableTestDrive = null;
+        }
+    }
+
+    public async Task RevertirVentaAsync(
+        Vehiculo vehiculo,
+        Venta venta,
+        HistorialEstadoVehiculo registroEstado,
+        HistorialUbicacionVehiculo registroUbicacion)
+    {
+        await _context.HistorialEstadosVehiculo.AddAsync(registroEstado);
+        await _context.HistorialUbicacionesVehiculo.AddAsync(registroUbicacion);
+
+        var ventaDb = await _context.Ventas.FirstOrDefaultAsync(vt => vt.Id == venta.Id);
+        if (ventaDb is not null)
+        {
+            ventaDb.Anulada = true;
+            ventaDb.MotivoAnulacion = venta.MotivoAnulacion;
+            ventaDb.FechaAnulacion = venta.FechaAnulacion;
+            ventaDb.AnuladaPorUsuarioId = venta.AnuladaPorUsuarioId;
+            ventaDb.AnuladaPorNombre = venta.AnuladaPorNombre;
+        }
+
+        var vehiculoDb = await _context.Vehiculos
+            .FirstOrDefaultAsync(v => v.Id == vehiculo.Id);
+
+        if (vehiculoDb is not null)
+        {
+            vehiculoDb.Estado = vehiculo.Estado;
+            vehiculoDb.ZonaLote = vehiculo.ZonaLote;
+            vehiculoDb.CajonLote = vehiculo.CajonLote;
+            vehiculoDb.FechaCambioEstado = vehiculo.FechaCambioEstado;
+            vehiculoDb.EstadoActualizadoPor = vehiculo.EstadoActualizadoPor;
+            vehiculoDb.EstadoActualizadoPorUsuarioId = vehiculo.EstadoActualizadoPorUsuarioId;
+            vehiculoDb.FechaReubicacion = vehiculo.FechaReubicacion;
+            vehiculoDb.ReubicadoPor = vehiculo.ReubicadoPor;
+            vehiculoDb.ReubicadoPorUsuarioId = vehiculo.ReubicadoPorUsuarioId;
         }
     }
 
