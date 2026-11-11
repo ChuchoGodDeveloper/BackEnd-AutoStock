@@ -247,4 +247,14 @@ public class VehiculoRepository : IVehiculoRepository
             .OrderByDescending(v => v.FechaVenta)
             .ToListAsync();
     }
+
+    public async Task<IReadOnlyList<Venta>> ObtenerVentasPorRangoAsync(DateTime fechaInicio, DateTime fechaFin)
+    {
+        return await _context.Ventas
+            .AsNoTracking()
+            .Include(v => v.Vehiculo)
+            .Where(v => !v.Anulada && v.FechaVenta >= fechaInicio && v.FechaVenta <= fechaFin)
+            .OrderByDescending(v => v.FechaVenta)
+            .ToListAsync();
+    }
 }

@@ -50,4 +50,6 @@ public interface IVehiculoRepository
     Task<IReadOnlyList<HistorialEstadoVehiculo>> ObtenerUltimosMovimientosAsync(int cantidad = 5);
 
     Task<IReadOnlyList<Venta>> ObtenerVentasMesActualAsync();
+
+    Task<IReadOnlyList<Venta>> ObtenerVentasPorRangoAsync(DateTime fechaInicio, DateTime fechaFin);
 }
