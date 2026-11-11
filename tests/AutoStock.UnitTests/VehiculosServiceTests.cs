@@ -1583,4 +1583,57 @@ public class VehiculosServiceTests
         Assert.Equal("A-01", resultado.CajonLote);
         _vehiculoRepositoryMock.Verify(r => r.RevertirVentaAsync(It.IsAny<Vehiculo>(), It.IsAny<Venta>(), It.IsAny<HistorialEstadoVehiculo>(), It.IsAny<HistorialUbicacionVehiculo>()), Times.Once);
     }
+
+    [Fact]
+    public async Task GenerarReporteVentasAsync_PeriodoEsteMes_CalculaTotalesYDevuelveVentas()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Mazda", "3", "MZ-123", "3AUTST25000000123");
+        var venta1 = new Venta
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            Vehiculo = vehiculo,
+            FechaVenta = DateTime.UtcNow,
+            AsesorId = 4,
+            AsesorNombre = "Asesor Prueba",
+            PrecioFinal = 320000m,
+            Anulada = false,
+        };
+        var venta2 = new Venta
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            Vehiculo = vehiculo,
+            FechaVenta = DateTime.UtcNow.AddHours(-2),
+            AsesorId = 4,
+            AsesorNombre = "Asesor Prueba",
+            PrecioFinal = 280000m,
+            Anulada = false,
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerVentasPorRangoAsync(It.IsAny<DateTime>(), It.IsAny<DateTime>()))
+            .ReturnsAsync(new List<Venta> { venta1, venta2 });
+
+        var reporte = await _vehiculosService.GenerarReporteVentasAsync("este_mes", null, null, 1, "Admin");
+
+        Assert.NotNull(reporte);
+        Assert.Equal("este_mes", reporte.Periodo);
+        Assert.Equal(2, reporte.TotalUnidades);
+        Assert.Equal(600000m, reporte.MontoTotal);
+        Assert.Equal("Admin", reporte.GeneradoPor);
+        Assert.Equal(2, reporte.Ventas.Count);
+    }
+
+    [Fact]
+    public async Task GenerarReporteVentasAsync_FechaInicialPosteriorAFinal_LanzaValidationAppException()
+    {
+        var fechaInicio = DateTime.UtcNow.Date;
+        var fechaFin = fechaInicio.AddDays(-5);
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(() =>
+            _vehiculosService.GenerarReporteVentasAsync("personalizado", fechaInicio, fechaFin, 1, "Admin"));
+
+        Assert.Contains("La fecha inicial no puede ser posterior a la final", ex.Message);
+    }
 }

@@ -76,4 +76,11 @@ public interface IVehiculosService
         RevertirVentaDto dto,
         int usuarioId,
         string nombreUsuario);
+
+    Task<ReporteVentasDto> GenerarReporteVentasAsync(
+        string? periodo,
+        DateTime? fechaInicio,
+        DateTime? fechaFin,
+        int? usuarioId,
+        string nombreUsuario);
 }

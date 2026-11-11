@@ -1227,6 +1227,85 @@ public class VehiculosService : IVehiculosService
         return CrearDetalleDto(vehiculo);
     }
 
+    public async Task<ReporteVentasDto> GenerarReporteVentasAsync(
+        string? periodo,
+        DateTime? fechaInicio,
+        DateTime? fechaFin,
+        int? usuarioId,
+        string nombreUsuario)
+    {
+        if (usuarioId.HasValue && _permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId.Value, CodigosPermiso.VerReporteVentas);
+        }
+
+        var ahora = DateTime.UtcNow;
+        DateTime inicio;
+        DateTime fin;
+        string periodoNormalizado = (periodo ?? "este_mes").Trim().ToLowerInvariant();
+
+        if (periodoNormalizado == "hoy")
+        {
+            inicio = ahora.Date;
+            fin = inicio.AddDays(1).AddTicks(-1);
+        }
+        else if (periodoNormalizado == "esta_semana")
+        {
+            var hoy = ahora.Date;
+            int diff = (7 + (hoy.DayOfWeek - DayOfWeek.Monday)) % 7;
+            inicio = hoy.AddDays(-1 * diff);
+            fin = inicio.AddDays(7).AddTicks(-1);
+        }
+        else if (periodoNormalizado == "personalizado" || periodoNormalizado == "rango")
+        {
+            if (!fechaInicio.HasValue || !fechaFin.HasValue)
+            {
+                throw new ValidationAppException("Debe especificar la fecha inicial y la fecha final para un rango personalizado.");
+            }
+
+            if (fechaInicio.Value.Date > fechaFin.Value.Date)
+            {
+                throw new ValidationAppException("La fecha inicial no puede ser posterior a la final");
+            }
+
+            inicio = fechaInicio.Value.Date;
+            fin = fechaFin.Value.Date.AddDays(1).AddTicks(-1);
+        }
+        else
+        {
+            periodoNormalizado = "este_mes";
+            inicio = new DateTime(ahora.Year, ahora.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            fin = inicio.AddMonths(1).AddTicks(-1);
+        }
+
+        var ventas = await _vehiculoRepository.ObtenerVentasPorRangoAsync(inicio, fin);
+
+        return new ReporteVentasDto
+        {
+            Periodo = periodoNormalizado,
+            FechaInicio = inicio,
+            FechaFin = fin,
+            TotalUnidades = ventas.Count,
+            MontoTotal = ventas.Sum(v => v.PrecioFinal),
+            GeneradoPor = string.IsNullOrWhiteSpace(nombreUsuario) ? "Usuario" : nombreUsuario,
+            FechaGeneracion = DateTime.UtcNow,
+            Ventas = ventas.Select(v => new ElementoReporteVentaDto
+            {
+                VentaId = v.Id,
+                FechaVenta = v.FechaVenta,
+                VehiculoId = v.VehiculoId,
+                Marca = v.Vehiculo?.Marca ?? string.Empty,
+                Modelo = v.Vehiculo?.Modelo ?? string.Empty,
+                Anio = v.Vehiculo?.Anio ?? 0,
+                NumeroStock = v.Vehiculo?.NumeroStock ?? string.Empty,
+                Vin = v.Vehiculo?.VIN ?? string.Empty,
+                AsesorId = v.AsesorId,
+                AsesorNombre = v.AsesorNombre,
+                PrecioFinal = v.PrecioFinal,
+            }).ToList(),
+        };
+    }
+
     private static VehiculoDetalleDto CrearDetalleDto(Vehiculo vehiculo)
     {
         var tomasObligatoriasCompletadas = vehiculo.Imagenes
