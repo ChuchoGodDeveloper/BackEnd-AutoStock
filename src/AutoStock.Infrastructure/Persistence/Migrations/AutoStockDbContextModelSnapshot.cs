@@ -185,6 +185,119 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.ToTable("ImagenesVehiculo", (string)null);
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.NotaAvanceOrden", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CreadoPorNombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("CreadoPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Nota")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("OrdenServicioId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrdenServicioId");
+
+                    b.ToTable("NotasAvanceOrdenes", (string)null);
+                });
+
+            modelBuilder.Entity("AutoStock.Domain.Entities.OrdenServicio", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CerradoPorNombre")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int?>("CerradoPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("CostoEstimado")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("CostoFinal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CreadoPorNombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("CreadoPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Descripcion")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("EstadoSalida")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("FechaCierre")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaEstimada")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Folio")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Prioridad")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Responsable")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("TipoTrabajo")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("VehiculoId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Folio")
+                        .IsUnique();
+
+                    b.HasIndex("VehiculoId");
+
+                    b.ToTable("OrdenesServicio", (string)null);
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.Permiso", b =>
                 {
                     b.Property<int>("Id")
@@ -685,6 +798,28 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Navigation("Vehiculo");
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.NotaAvanceOrden", b =>
+                {
+                    b.HasOne("AutoStock.Domain.Entities.OrdenServicio", "OrdenServicio")
+                        .WithMany("NotasAvance")
+                        .HasForeignKey("OrdenServicioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrdenServicio");
+                });
+
+            modelBuilder.Entity("AutoStock.Domain.Entities.OrdenServicio", b =>
+                {
+                    b.HasOne("AutoStock.Domain.Entities.Vehiculo", "Vehiculo")
+                        .WithMany("OrdenesServicio")
+                        .HasForeignKey("VehiculoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vehiculo");
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.RolPermiso", b =>
                 {
                     b.HasOne("AutoStock.Domain.Entities.Permiso", "Permiso")
@@ -748,6 +883,11 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Navigation("Vehiculo");
                 });
 
+            modelBuilder.Entity("AutoStock.Domain.Entities.OrdenServicio", b =>
+                {
+                    b.Navigation("NotasAvance");
+                });
+
             modelBuilder.Entity("AutoStock.Domain.Entities.Permiso", b =>
                 {
                     b.Navigation("RolPermisos");
@@ -774,6 +914,8 @@ namespace AutoStock.Infrastructure.Persistence.Migrations
                     b.Navigation("HistorialUbicaciones");
 
                     b.Navigation("Imagenes");
+
+                    b.Navigation("OrdenesServicio");
 
                     b.Navigation("Ventas");
                 });
