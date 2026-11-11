@@ -1636,4 +1636,136 @@ public class VehiculosServiceTests
 
         Assert.Contains("La fecha inicial no puede ser posterior a la final", ex.Message);
     }
+
+    [Fact]
+    public async Task CrearOrdenServicioAsync_DatosValidos_CreaOrdenYCambiaEstadoAEnTaller()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Nissan", "Sentra", "NS-111", "3AUTST25000000111");
+        vehiculo.Estado = EstadoOperativo.Disponible;
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerOrdenServicioAbiertaAsync(vehiculo.Id))
+            .ReturnsAsync((OrdenServicio?)null);
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.GenerarSiguienteFolioOrdenServicioAsync())
+            .ReturnsAsync("OS-0001");
+
+        var dto = new CrearOrdenServicioDto
+        {
+            TipoTrabajo = "Mecánico",
+            Descripcion = "Cambio de balatas delanteras",
+            Prioridad = "Alta",
+            CostoEstimado = 3500m,
+            Responsable = "Taller Central",
+            FechaEstimada = DateTime.UtcNow.AddDays(2),
+        };
+
+        var resultado = await _vehiculosService.CrearOrdenServicioAsync(
+            vehiculo.Id,
+            dto,
+            3,
+            "Encargado Lote",
+            "Encargado de Lote y Recepción");
+
+        Assert.NotNull(resultado);
+        Assert.Equal("OS-0001", resultado.Folio);
+        Assert.Equal("Abierta", resultado.Estado);
+        Assert.Equal(EstadoOperativo.EnTaller, vehiculo.Estado);
+        _vehiculoRepositoryMock.Verify(r => r.GuardarOrdenServicioAsync(It.IsAny<OrdenServicio>(), vehiculo, It.IsAny<HistorialEstadoVehiculo>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CrearOrdenServicioAsync_UnidadVendida_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Toyota", "Corolla", "TY-222", "3AUTST25000000222");
+        vehiculo.Estado = EstadoOperativo.Vendido;
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new CrearOrdenServicioDto
+        {
+            TipoTrabajo = "Estético",
+            Descripcion = "Pulido de faros",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(() =>
+            _vehiculosService.CrearOrdenServicioAsync(vehiculo.Id, dto, 3, "Encargado", "Encargado"));
+
+        Assert.Contains("No se puede crear una orden de servicio para una unidad vendida", ex.Message);
+    }
+
+    [Fact]
+    public async Task CerrarOrdenServicioAsync_DatosValidos_CierraOrdenYActualizaEstadoVehiculo()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Honda", "Civic", "HN-333", "3AUTST25000000333");
+        vehiculo.Estado = EstadoOperativo.EnTaller;
+
+        var orden = new OrdenServicio
+        {
+            Id = Guid.NewGuid(),
+            Folio = "OS-0005",
+            VehiculoId = vehiculo.Id,
+            Vehiculo = vehiculo,
+            Estado = "Abierta",
+            TipoTrabajo = "Mecánico y estético",
+            Descripcion = "Afinación y lavado de motor",
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerOrdenServicioPorIdAsync(orden.Id))
+            .ReturnsAsync(orden);
+
+        var dto = new CerrarOrdenServicioDto
+        {
+            CostoFinal = 4200m,
+            EstadoSalida = "Disponible",
+        };
+
+        var resultado = await _vehiculosService.CerrarOrdenServicioAsync(
+            orden.Id,
+            dto,
+            3,
+            "Encargado Lote",
+            "Encargado de Lote y Recepción");
+
+        Assert.Equal("Cerrada", resultado.Estado);
+        Assert.Equal(4200m, resultado.CostoFinal);
+        Assert.Equal(EstadoOperativo.Disponible, vehiculo.Estado);
+        _vehiculoRepositoryMock.Verify(r => r.CerrarOrdenServicioAsync(orden, vehiculo, It.IsAny<HistorialEstadoVehiculo>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ObtenerHistorialMantenimientoAsync_AsesorDeVentas_OcultaCostoFinal()
+    {
+        var vehiculoId = Guid.NewGuid();
+        var orden = new OrdenServicio
+        {
+            Id = Guid.NewGuid(),
+            Folio = "OS-0002",
+            VehiculoId = vehiculoId,
+            Estado = "Cerrada",
+            TipoTrabajo = "Mecánico",
+            Descripcion = "Cambio de bujías",
+            CostoFinal = 2500m,
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerOrdenesServicioPorVehiculoAsync(vehiculoId, true))
+            .ReturnsAsync(new List<OrdenServicio> { orden });
+
+        var historialAsesor = await _vehiculosService.ObtenerHistorialMantenimientoAsync(vehiculoId, "Asesor de Ventas");
+        Assert.Single(historialAsesor);
+        Assert.Null(historialAsesor[0].CostoFinal);
+
+        var historialEncargado = await _vehiculosService.ObtenerHistorialMantenimientoAsync(vehiculoId, "Encargado de Lote y Recepción");
+        Assert.Single(historialEncargado);
+        Assert.Equal(2500m, historialEncargado[0].CostoFinal);
+    }
 }

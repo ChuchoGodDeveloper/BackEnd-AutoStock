@@ -257,4 +257,67 @@ public class VehiculoRepository : IVehiculoRepository
             .OrderByDescending(v => v.FechaVenta)
             .ToListAsync();
     }
+
+    public async Task<string> GenerarSiguienteFolioOrdenServicioAsync()
+    {
+        var total = await _context.OrdenesServicio.CountAsync();
+        return $"OS-{(total + 1):D4}";
+    }
+
+    public async Task<OrdenServicio?> ObtenerOrdenServicioAbiertaAsync(Guid vehiculoId)
+    {
+        return await _context.OrdenesServicio
+            .Include(o => o.NotasAvance.OrderBy(n => n.FechaCreacion))
+            .FirstOrDefaultAsync(o => o.VehiculoId == vehiculoId && o.Estado == "Abierta");
+    }
+
+    public async Task<OrdenServicio?> ObtenerOrdenServicioPorIdAsync(Guid ordenId)
+    {
+        return await _context.OrdenesServicio
+            .Include(o => o.Vehiculo)
+            .Include(o => o.NotasAvance.OrderBy(n => n.FechaCreacion))
+            .FirstOrDefaultAsync(o => o.Id == ordenId);
+    }
+
+    public async Task<IReadOnlyList<OrdenServicio>> ObtenerOrdenesServicioPorVehiculoAsync(Guid vehiculoId, bool soloCerradas = false)
+    {
+        var query = _context.OrdenesServicio
+            .AsNoTracking()
+            .Include(o => o.NotasAvance.OrderBy(n => n.FechaCreacion))
+            .Where(o => o.VehiculoId == vehiculoId);
+
+        if (soloCerradas)
+        {
+            query = query.Where(o => o.Estado == "Cerrada");
+        }
+
+        return await query
+            .OrderByDescending(o => o.FechaCierre ?? o.FechaCreacion)
+            .ToListAsync();
+    }
+
+    public async Task GuardarOrdenServicioAsync(OrdenServicio orden, Vehiculo vehiculo, HistorialEstadoVehiculo historialEstado)
+    {
+        await _context.OrdenesServicio.AddAsync(orden);
+        _context.Vehiculos.Update(vehiculo);
+        await _context.HistorialEstadosVehiculo.AddAsync(historialEstado);
+    }
+
+    public async Task ActualizarOrdenServicioAsync(OrdenServicio orden)
+    {
+        _context.OrdenesServicio.Update(orden);
+        await Task.CompletedTask;
+    }
+
+    public async Task CerrarOrdenServicioAsync(OrdenServicio orden, Vehiculo vehiculo, HistorialEstadoVehiculo historialEstado)
+    {
+        _context.OrdenesServicio.Update(orden);
+        _context.Vehiculos.Update(vehiculo);
+        await _context.HistorialEstadosVehiculo.AddAsync(historialEstado);
+    }
+
+    public async Task AgregarNotaAvanceAsync(NotaAvanceOrden nota)
+    {
+        await _context.NotasAvanceOrdenes.AddAsync(nota);
+    }
 }

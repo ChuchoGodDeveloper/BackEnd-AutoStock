@@ -34,6 +34,10 @@ public class AutoStockDbContext : DbContext
 
     public DbSet<Venta> Ventas => Set<Venta>();
 
+    public DbSet<OrdenServicio> OrdenesServicio => Set<OrdenServicio>();
+
+    public DbSet<NotaAvanceOrden> NotasAvanceOrdenes => Set<NotaAvanceOrden>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

@@ -1306,6 +1306,286 @@ public class VehiculosService : IVehiculosService
         };
     }
 
+    public async Task<OrdenServicioDto> CrearOrdenServicioAsync(
+        Guid vehiculoId,
+        CrearOrdenServicioDto dto,
+        int usuarioId,
+        string nombreUsuario,
+        string rolUsuario)
+    {
+        if (_permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId, CodigosPermiso.GestionarOrdenesServicio);
+        }
+
+        var vehiculo = await _vehiculoRepository.ObtenerPorIdAsync(vehiculoId);
+        if (vehiculo is null)
+        {
+            throw new NotFoundException("Vehículo no encontrado");
+        }
+
+        if (vehiculo.Estado == EstadoOperativo.Vendido)
+        {
+            throw new ValidationAppException("No se puede crear una orden de servicio para una unidad vendida");
+        }
+
+        if (vehiculo.Estado == EstadoOperativo.TestDrive)
+        {
+            throw new ValidationAppException("No se puede crear una orden de servicio para una unidad en Test Drive");
+        }
+
+        var ordenAbierta = await _vehiculoRepository.ObtenerOrdenServicioAbiertaAsync(vehiculoId);
+        if (ordenAbierta is not null)
+        {
+            throw new ValidationAppException($"La unidad ya cuenta con la orden de servicio abierta {ordenAbierta.Folio}");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.TipoTrabajo))
+        {
+            throw new ValidationAppException("El tipo de trabajo es obligatorio");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Descripcion))
+        {
+            throw new ValidationAppException("La descripción del trabajo es obligatoria");
+        }
+
+        if (dto.Descripcion.Trim().Length > 500)
+        {
+            throw new ValidationAppException("La descripción no puede exceder 500 caracteres");
+        }
+
+        if (dto.CostoEstimado.HasValue && dto.CostoEstimado.Value < 0)
+        {
+            throw new ValidationAppException("El costo estimado no puede ser negativo");
+        }
+
+        if (dto.FechaEstimada.HasValue && dto.FechaEstimada.Value.Date < DateTime.UtcNow.Date)
+        {
+            throw new ValidationAppException("La fecha estimada no puede ser anterior a la fecha actual");
+        }
+
+        var folio = await _vehiculoRepository.GenerarSiguienteFolioOrdenServicioAsync();
+
+        var orden = new OrdenServicio
+        {
+            Id = Guid.NewGuid(),
+            Folio = folio,
+            VehiculoId = vehiculo.Id,
+            TipoTrabajo = dto.TipoTrabajo.Trim(),
+            Descripcion = dto.Descripcion.Trim(),
+            Prioridad = string.IsNullOrWhiteSpace(dto.Prioridad) ? "Media" : dto.Prioridad.Trim(),
+            CostoEstimado = dto.CostoEstimado,
+            Responsable = dto.Responsable?.Trim() ?? string.Empty,
+            FechaEstimada = dto.FechaEstimada,
+            Estado = "Abierta",
+            FechaCreacion = DateTime.UtcNow,
+            CreadoPorUsuarioId = usuarioId,
+            CreadoPorNombre = nombreUsuario,
+        };
+
+        var estadoAnterior = vehiculo.Estado;
+        vehiculo.Estado = EstadoOperativo.EnTaller;
+
+        var historialEstado = new HistorialEstadoVehiculo
+        {
+            Id = Guid.NewGuid(),
+            VehiculoId = vehiculo.Id,
+            EstadoAnterior = estadoAnterior,
+            EstadoNuevo = EstadoOperativo.EnTaller,
+            FechaCambio = DateTime.UtcNow,
+            UsuarioId = usuarioId,
+            CambiadoPor = nombreUsuario,
+        };
+
+        await _vehiculoRepository.GuardarOrdenServicioAsync(orden, vehiculo, historialEstado);
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        return MapearOrdenDto(orden);
+    }
+
+    public async Task<OrdenServicioDto?> ObtenerOrdenServicioAbiertaAsync(Guid vehiculoId)
+    {
+        var orden = await _vehiculoRepository.ObtenerOrdenServicioAbiertaAsync(vehiculoId);
+        return orden is null ? null : MapearOrdenDto(orden);
+    }
+
+    public async Task<OrdenServicioDto> AgregarNotaAvanceAsync(
+        Guid ordenId,
+        AgregarNotaAvanceDto dto,
+        int usuarioId,
+        string nombreUsuario,
+        string rolUsuario)
+    {
+        if (_permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId, CodigosPermiso.GestionarOrdenesServicio);
+        }
+
+        var orden = await _vehiculoRepository.ObtenerOrdenServicioPorIdAsync(ordenId);
+        if (orden is null)
+        {
+            throw new NotFoundException("Orden de servicio no encontrada");
+        }
+
+        if (orden.Estado != "Abierta")
+        {
+            throw new ValidationAppException("Solo se pueden agregar notas de avance a una orden abierta");
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Nota))
+        {
+            throw new ValidationAppException("La nota de avance no puede estar vacía");
+        }
+
+        var nota = new NotaAvanceOrden
+        {
+            Id = Guid.NewGuid(),
+            OrdenServicioId = orden.Id,
+            Nota = dto.Nota.Trim(),
+            FechaCreacion = DateTime.UtcNow,
+            CreadoPorUsuarioId = usuarioId,
+            CreadoPorNombre = nombreUsuario,
+        };
+
+        await _vehiculoRepository.AgregarNotaAvanceAsync(nota);
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        orden.NotasAvance.Add(nota);
+        return MapearOrdenDto(orden);
+    }
+
+    public async Task<OrdenServicioDto> CerrarOrdenServicioAsync(
+        Guid ordenId,
+        CerrarOrdenServicioDto dto,
+        int usuarioId,
+        string nombreUsuario,
+        string rolUsuario)
+    {
+        if (_permisosService is not null)
+        {
+            await _permisosService.ValidarPermisoAsync(usuarioId, CodigosPermiso.GestionarOrdenesServicio);
+        }
+
+        var orden = await _vehiculoRepository.ObtenerOrdenServicioPorIdAsync(ordenId);
+        if (orden is null)
+        {
+            throw new NotFoundException("Orden de servicio no encontrada");
+        }
+
+        if (orden.Estado != "Abierta")
+        {
+            throw new ValidationAppException("Solo se puede cerrar una orden que esté en estado Abierta");
+        }
+
+        if (dto.CostoFinal < 0)
+        {
+            throw new ValidationAppException("El costo final no puede ser negativo");
+        }
+
+        if (!Enum.TryParse<EstadoOperativo>(dto.EstadoSalida, true, out var estadoSalidaEnum) ||
+            (estadoSalidaEnum != EstadoOperativo.Disponible && estadoSalidaEnum != EstadoOperativo.EnLavado))
+        {
+            throw new ValidationAppException("El estado de salida solo puede ser 'Disponible' o 'EnLavado'");
+        }
+
+        orden.Estado = "Cerrada";
+        orden.FechaCierre = DateTime.UtcNow;
+        orden.CostoFinal = dto.CostoFinal;
+        orden.CerradoPorUsuarioId = usuarioId;
+        orden.CerradoPorNombre = nombreUsuario;
+        orden.EstadoSalida = estadoSalidaEnum.ToString();
+
+        var vehiculo = orden.Vehiculo ?? await _vehiculoRepository.ObtenerPorIdAsync(orden.VehiculoId);
+        if (vehiculo is not null)
+        {
+            var estadoAnterior = vehiculo.Estado;
+            vehiculo.Estado = estadoSalidaEnum;
+
+            var historial = new HistorialEstadoVehiculo
+            {
+                Id = Guid.NewGuid(),
+                VehiculoId = vehiculo.Id,
+                EstadoAnterior = estadoAnterior,
+                EstadoNuevo = estadoSalidaEnum,
+                FechaCambio = DateTime.UtcNow,
+                UsuarioId = usuarioId,
+                CambiadoPor = nombreUsuario,
+            };
+
+            await _vehiculoRepository.CerrarOrdenServicioAsync(orden, vehiculo, historial);
+        }
+        else
+        {
+            await _vehiculoRepository.ActualizarOrdenServicioAsync(orden);
+        }
+
+        if (_unitOfWork is not null)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        return MapearOrdenDto(orden);
+    }
+
+    public async Task<IReadOnlyList<OrdenServicioDto>> ObtenerHistorialMantenimientoAsync(
+        Guid vehiculoId,
+        string rolUsuario)
+    {
+        var ordenes = await _vehiculoRepository.ObtenerOrdenesServicioPorVehiculoAsync(vehiculoId, soloCerradas: true);
+        var esAsesor = string.Equals(rolUsuario?.Trim(), "Asesor de Ventas", StringComparison.OrdinalIgnoreCase);
+
+        return ordenes.Select(o =>
+        {
+            var dto = MapearOrdenDto(o);
+            if (esAsesor)
+            {
+                dto.CostoFinal = null;
+            }
+            return dto;
+        }).ToList();
+    }
+
+    private static OrdenServicioDto MapearOrdenDto(OrdenServicio orden)
+    {
+        return new OrdenServicioDto
+        {
+            Id = orden.Id,
+            Folio = orden.Folio,
+            VehiculoId = orden.VehiculoId,
+            TipoTrabajo = orden.TipoTrabajo,
+            Descripcion = orden.Descripcion,
+            Prioridad = orden.Prioridad,
+            CostoEstimado = orden.CostoEstimado,
+            Responsable = orden.Responsable,
+            FechaEstimada = orden.FechaEstimada,
+            Estado = orden.Estado,
+            FechaCreacion = orden.FechaCreacion,
+            CreadoPorUsuarioId = orden.CreadoPorUsuarioId,
+            CreadoPorNombre = orden.CreadoPorNombre,
+            FechaCierre = orden.FechaCierre,
+            CerradoPorNombre = orden.CerradoPorNombre,
+            CostoFinal = orden.CostoFinal,
+            EstadoSalida = orden.EstadoSalida,
+            NotasAvance = orden.NotasAvance?.Select(n => new NotaAvanceDto
+            {
+                Id = n.Id,
+                Nota = n.Nota,
+                FechaCreacion = n.FechaCreacion,
+                CreadoPorUsuarioId = n.CreadoPorUsuarioId,
+                CreadoPorNombre = n.CreadoPorNombre,
+            }).ToList() ?? [],
+        };
+    }
+
     private static VehiculoDetalleDto CrearDetalleDto(Vehiculo vehiculo)
     {
         var tomasObligatoriasCompletadas = vehiculo.Imagenes
