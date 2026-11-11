@@ -83,4 +83,31 @@ public interface IVehiculosService
         DateTime? fechaFin,
         int? usuarioId,
         string nombreUsuario);
+
+    Task<OrdenServicioDto> CrearOrdenServicioAsync(
+        Guid vehiculoId,
+        CrearOrdenServicioDto dto,
+        int usuarioId,
+        string nombreUsuario,
+        string rolUsuario);
+
+    Task<OrdenServicioDto?> ObtenerOrdenServicioAbiertaAsync(Guid vehiculoId);
+
+    Task<OrdenServicioDto> AgregarNotaAvanceAsync(
+        Guid ordenId,
+        AgregarNotaAvanceDto dto,
+        int usuarioId,
+        string nombreUsuario,
+        string rolUsuario);
+
+    Task<OrdenServicioDto> CerrarOrdenServicioAsync(
+        Guid ordenId,
+        CerrarOrdenServicioDto dto,
+        int usuarioId,
+        string nombreUsuario,
+        string rolUsuario);
+
+    Task<IReadOnlyList<OrdenServicioDto>> ObtenerHistorialMantenimientoAsync(
+        Guid vehiculoId,
+        string rolUsuario);
 }

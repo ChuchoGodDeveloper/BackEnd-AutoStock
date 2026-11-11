@@ -52,4 +52,20 @@ public interface IVehiculoRepository
     Task<IReadOnlyList<Venta>> ObtenerVentasMesActualAsync();
 
     Task<IReadOnlyList<Venta>> ObtenerVentasPorRangoAsync(DateTime fechaInicio, DateTime fechaFin);
+
+    Task<string> GenerarSiguienteFolioOrdenServicioAsync();
+
+    Task<OrdenServicio?> ObtenerOrdenServicioAbiertaAsync(Guid vehiculoId);
+
+    Task<OrdenServicio?> ObtenerOrdenServicioPorIdAsync(Guid ordenId);
+
+    Task<IReadOnlyList<OrdenServicio>> ObtenerOrdenesServicioPorVehiculoAsync(Guid vehiculoId, bool soloCerradas = false);
+
+    Task GuardarOrdenServicioAsync(OrdenServicio orden, Vehiculo vehiculo, HistorialEstadoVehiculo historialEstado);
+
+    Task ActualizarOrdenServicioAsync(OrdenServicio orden);
+
+    Task CerrarOrdenServicioAsync(OrdenServicio orden, Vehiculo vehiculo, HistorialEstadoVehiculo historialEstado);
+
+    Task AgregarNotaAvanceAsync(NotaAvanceOrden nota);
 }

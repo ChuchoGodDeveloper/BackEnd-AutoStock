@@ -85,4 +85,6 @@ public class Vehiculo
     public List<HistorialKilometrajeVehiculo> HistorialKilometrajes { get; set; } = [];
 
     public List<Venta> Ventas { get; set; } = [];
+
+    public List<OrdenServicio> OrdenesServicio { get; set; } = [];
 }
