@@ -1768,4 +1768,162 @@ public class VehiculosServiceTests
         Assert.Single(historialEncargado);
         Assert.Equal(2500m, historialEncargado[0].CostoFinal);
     }
+
+    [Fact]
+    public async Task GenerarReporteVentasAsync_PeriodoPersonalizadoSinFechas_LanzaValidationAppException()
+    {
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(() =>
+            _vehiculosService.GenerarReporteVentasAsync("personalizado", null, null, 1, "Admin"));
+
+        Assert.Contains("Debe especificar la fecha inicial y la fecha final para un rango personalizado.", ex.Message);
+    }
+
+    [Fact]
+    public async Task CrearOrdenServicioAsync_UnidadEnTestDrive_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Volkswagen", "Jetta", "VW-101", "3AUTST25000000101");
+        vehiculo.Estado = EstadoOperativo.TestDrive;
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        var dto = new CrearOrdenServicioDto
+        {
+            TipoTrabajo = "Mecánico",
+            Descripcion = "Revisión de suspensión",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(() =>
+            _vehiculosService.CrearOrdenServicioAsync(vehiculo.Id, dto, 3, "Encargado Lote", "Encargado de Lote y Recepción"));
+
+        Assert.Contains("No se puede crear una orden de servicio para una unidad en Test Drive", ex.Message);
+    }
+
+    [Fact]
+    public async Task CrearOrdenServicioAsync_YaTieneOrdenAbierta_LanzaValidationAppException()
+    {
+        var vehiculo = CrearVehiculoParaBusqueda(0, "Kia", "Forte", "KA-202", "3AUTST25000000202");
+        vehiculo.Estado = EstadoOperativo.Disponible;
+
+        var ordenExistente = new OrdenServicio
+        {
+            Id = Guid.NewGuid(),
+            Folio = "OS-0009",
+            VehiculoId = vehiculo.Id,
+            Estado = "Abierta",
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerPorIdAsync(vehiculo.Id))
+            .ReturnsAsync(vehiculo);
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerOrdenServicioAbiertaAsync(vehiculo.Id))
+            .ReturnsAsync(ordenExistente);
+
+        var dto = new CrearOrdenServicioDto
+        {
+            TipoTrabajo = "Estético",
+            Descripcion = "Lavado de vestiduras",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(() =>
+            _vehiculosService.CrearOrdenServicioAsync(vehiculo.Id, dto, 3, "Encargado Lote", "Encargado de Lote y Recepción"));
+
+        Assert.Contains("La unidad ya cuenta con la orden de servicio abierta OS-0009", ex.Message);
+    }
+
+    [Fact]
+    public async Task AgregarNotaAvanceAsync_DatosValidos_AgregaNotaYGuardaCambios()
+    {
+        var orden = new OrdenServicio
+        {
+            Id = Guid.NewGuid(),
+            Folio = "OS-0010",
+            VehiculoId = Guid.NewGuid(),
+            Estado = "Abierta",
+            TipoTrabajo = "Mecánico",
+            Descripcion = "Cambio de aceite",
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerOrdenServicioPorIdAsync(orden.Id))
+            .ReturnsAsync(orden);
+
+        var dto = new AgregarNotaAvanceDto
+        {
+            Nota = "Se completó el drenado de aceite y reemplazo de filtro",
+        };
+
+        var resultado = await _vehiculosService.AgregarNotaAvanceAsync(
+            orden.Id,
+            dto,
+            3,
+            "Encargado Lote",
+            "Encargado de Lote y Recepción");
+
+        Assert.Single(resultado.NotasAvance);
+        Assert.Equal("Se completó el drenado de aceite y reemplazo de filtro", resultado.NotasAvance[0].Nota);
+        Assert.Equal("Encargado Lote", resultado.NotasAvance[0].CreadoPorNombre);
+        _vehiculoRepositoryMock.Verify(r => r.AgregarNotaAvanceAsync(It.IsAny<NotaAvanceOrden>()), Times.Once);
+        _unitOfWorkMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task AgregarNotaAvanceAsync_OrdenCerrada_LanzaValidationAppException()
+    {
+        var orden = new OrdenServicio
+        {
+            Id = Guid.NewGuid(),
+            Folio = "OS-0011",
+            VehiculoId = Guid.NewGuid(),
+            Estado = "Cerrada",
+            TipoTrabajo = "Estético",
+            Descripcion = "Encerado",
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerOrdenServicioPorIdAsync(orden.Id))
+            .ReturnsAsync(orden);
+
+        var dto = new AgregarNotaAvanceDto
+        {
+            Nota = "Intento de nota en orden cerrada",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(() =>
+            _vehiculosService.AgregarNotaAvanceAsync(orden.Id, dto, 3, "Encargado Lote", "Encargado de Lote y Recepción"));
+
+        Assert.Contains("Solo se pueden agregar notas de avance a una orden abierta", ex.Message);
+    }
+
+    [Fact]
+    public async Task CerrarOrdenServicioAsync_EstadoSalidaInvalido_LanzaValidationAppException()
+    {
+        var orden = new OrdenServicio
+        {
+            Id = Guid.NewGuid(),
+            Folio = "OS-0012",
+            VehiculoId = Guid.NewGuid(),
+            Estado = "Abierta",
+            TipoTrabajo = "Mecánico",
+            Descripcion = "Revisión general",
+        };
+
+        _vehiculoRepositoryMock
+            .Setup(r => r.ObtenerOrdenServicioPorIdAsync(orden.Id))
+            .ReturnsAsync(orden);
+
+        var dto = new CerrarOrdenServicioDto
+        {
+            CostoFinal = 1500m,
+            EstadoSalida = "Vendido",
+        };
+
+        var ex = await Assert.ThrowsAsync<ValidationAppException>(() =>
+            _vehiculosService.CerrarOrdenServicioAsync(orden.Id, dto, 3, "Encargado Lote", "Encargado de Lote y Recepción"));
+
+        Assert.Contains("El estado de salida solo puede ser 'Disponible' o 'EnLavado'", ex.Message);
+    }
 }
