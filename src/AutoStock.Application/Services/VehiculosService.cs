@@ -69,6 +69,31 @@ public class VehiculosService : IVehiculosService
         decimal? precioMin = null,
         decimal? precioMax = null)
     {
+        var pagina = page < 1 ? 1 : page;
+        var tamanio = pageSize < 1
+            ? TamanioPaginaPorDefecto
+            : Math.Min(pageSize, TamanioPaginaMaximo);
+
+        var paginadoSql = await _vehiculoRepository.ObtenerCatalogoPaginadoAsync(
+            pagina,
+            tamanio,
+            busqueda,
+            estados,
+            tipo,
+            precioMin,
+            precioMax);
+
+        if (paginadoSql is { } resultadoSql)
+        {
+            return new PaginatedResult<VehiculoDto>
+            {
+                Items = resultadoSql.Items.Select(CrearDto).ToList(),
+                TotalCount = resultadoSql.TotalCount,
+                Page = pagina,
+                PageSize = tamanio,
+            };
+        }
+
         var vehiculos = await _vehiculoRepository.ObtenerTodosAsync();
 
         IEnumerable<Vehiculo> catalogo = vehiculos;
@@ -112,11 +137,6 @@ public class VehiculosService : IVehiculosService
         var catalogoFiltrado = catalogo
             .OrderByDescending(v => v.FechaRegistro)
             .ToList();
-
-        var pagina = page < 1 ? 1 : page;
-        var tamanio = pageSize < 1
-            ? TamanioPaginaPorDefecto
-            : Math.Min(pageSize, TamanioPaginaMaximo);
 
         var items = catalogoFiltrado
             .Skip((pagina - 1) * tamanio)
