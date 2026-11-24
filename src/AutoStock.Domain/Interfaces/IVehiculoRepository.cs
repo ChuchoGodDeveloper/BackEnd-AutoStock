@@ -1,10 +1,20 @@
 using AutoStock.Domain.Entities;
+using AutoStock.Domain.Enums;
 
 namespace AutoStock.Domain.Interfaces;
 
 public interface IVehiculoRepository
 {
     Task<IReadOnlyList<Vehiculo>> ObtenerTodosAsync();
+
+    Task<(IReadOnlyList<Vehiculo> Items, int TotalCount)?> ObtenerCatalogoPaginadoAsync(
+        int page,
+        int pageSize,
+        string? busqueda = null,
+        List<EstadoOperativo>? estados = null,
+        TipoVehiculo? tipo = null,
+        decimal? precioMin = null,
+        decimal? precioMax = null);
 
     Task<Vehiculo?> ObtenerPorIdAsync(Guid id);
 
