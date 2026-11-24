@@ -19,8 +19,63 @@ public class VehiculoRepository : IVehiculoRepository
     {
         return await _context.Vehiculos
             .AsNoTracking()
-            .Include(v => v.Imagenes)
             .ToListAsync();
+    }
+
+    public async Task<(IReadOnlyList<Vehiculo> Items, int TotalCount)?> ObtenerCatalogoPaginadoAsync(
+        int page,
+        int pageSize,
+        string? busqueda = null,
+        List<EstadoOperativo>? estados = null,
+        TipoVehiculo? tipo = null,
+        decimal? precioMin = null,
+        decimal? precioMax = null)
+    {
+        IQueryable<Vehiculo> query = _context.Vehiculos.AsNoTracking();
+
+        if (estados is { Count: > 0 })
+        {
+            query = query.Where(v => estados.Contains(v.Estado));
+        }
+        else
+        {
+            query = query.Where(v => v.Estado != EstadoOperativo.Vendido);
+        }
+
+        if (tipo.HasValue)
+        {
+            query = query.Where(v => v.Tipo == tipo.Value);
+        }
+
+        if (precioMin.HasValue)
+        {
+            query = query.Where(v => v.Precio >= precioMin.Value);
+        }
+
+        if (precioMax.HasValue)
+        {
+            query = query.Where(v => v.Precio <= precioMax.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(busqueda))
+        {
+            string termino = busqueda.Replace(" ", string.Empty).Replace("-", string.Empty).ToUpperInvariant();
+            query = query.Where(v =>
+                v.Marca.Replace(" ", string.Empty).Replace("-", string.Empty).ToUpper().Contains(termino) ||
+                v.Modelo.Replace(" ", string.Empty).Replace("-", string.Empty).ToUpper().Contains(termino) ||
+                v.Anio.ToString().Contains(termino) ||
+                v.VIN.Replace(" ", string.Empty).Replace("-", string.Empty).ToUpper().Contains(termino) ||
+                (v.Placa != null && v.Placa.Replace(" ", string.Empty).Replace("-", string.Empty).ToUpper().Contains(termino)));
+        }
+
+        int totalCount = await query.CountAsync();
+        List<Vehiculo> items = await query
+            .OrderByDescending(v => v.FechaRegistro)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
     }
 
     public async Task<Vehiculo?> ObtenerPorIdAsync(Guid id)
