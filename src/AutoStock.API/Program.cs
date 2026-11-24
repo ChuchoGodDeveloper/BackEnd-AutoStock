@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using AutoStock.Application.Interfaces;
 using AutoStock.Infrastructure;
 using AutoStock.Infrastructure.Persistence;
@@ -10,7 +11,11 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
